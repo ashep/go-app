@@ -14,13 +14,13 @@ import (
 	"github.com/ashep/go-cfgloader"
 )
 
-type app interface {
+type App interface {
 	Run(ctx context.Context) error
 }
 
-type factory func(cfg any, l zerolog.Logger) app
+type factory[cfgT any] func(cfg cfgT, l zerolog.Logger) App
 
-func Run(name string, f factory, cfg any) {
+func Run[CT any](name string, f factory[CT], cfg CT) {
 	if name == "" {
 		panic("empty app name")
 	}
