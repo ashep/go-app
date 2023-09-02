@@ -18,9 +18,9 @@ type App interface {
 	Run(ctx context.Context) error
 }
 
-type factory[cfgT any] func(cfg cfgT, l zerolog.Logger) App
+type factory[AT App, CT any] func(cfg CT, l zerolog.Logger) AT
 
-func Run[CT any](name string, f factory[CT], cfg CT) {
+func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 	if name == "" {
 		panic("empty app name")
 	}
