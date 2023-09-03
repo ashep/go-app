@@ -14,7 +14,7 @@ import (
 )
 
 type App interface {
-	Run(ctx context.Context) error
+	Run(ctx context.Context, args []string) error
 }
 
 type factory[AT App, CT any] func(cfg CT, l zerolog.Logger) AT
@@ -66,7 +66,7 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		ctxC()
 	}()
 
-	if err := f(cfg, l).Run(ctx); err != nil {
+	if err := f(cfg, l).Run(ctx, os.Args); err != nil {
 		l.Error().Err(err).Msg("app run failed")
 		os.Exit(1)
 	}
