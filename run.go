@@ -30,7 +30,13 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		name = "app"
 	}
 
-	l := log.Logger.With().Str("app", name).Logger()
+	ll := zerolog.InfoLevel
+	dbg := os.Getenv("APP_DEBUG")
+	if dbg == "true" || dbg == "1" {
+		ll = zerolog.DebugLevel
+	}
+
+	l := log.Logger.Level(ll).With().Str("app", name).Logger()
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice { // Terminal
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
@@ -40,6 +46,7 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 			l.Error().Err(err).Msg("load config from file failed")
 			os.Exit(1)
 		}
+		l.Debug().Str("path", cfgPath).Msg("config loaded from file")
 	}
 
 	if err := cfgloader.LoadFromEnv(name, &cfg); err != nil {
