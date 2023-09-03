@@ -4,7 +4,6 @@ import (
 	"context"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
@@ -21,20 +20,22 @@ type App interface {
 type factory[AT App, CT any] func(cfg CT, l zerolog.Logger) AT
 
 func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
-	if name == "" {
-		panic("empty app name")
-	}
-	nameUpper := strings.ToUpper(name)
-
 	time.Local = time.UTC
+
+	if n := os.Getenv("APP_NAME"); n != "" {
+		name = n
+	}
+
+	if name == "" {
+		name = "app"
+	}
 
 	l := log.Logger.With().Str("app", name).Logger()
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice { // Terminal
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
 
-	cfgPath := os.Getenv(nameUpper + "_CONFIG_PATH")
-	if cfgPath != "" {
+	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
 		if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil {
 			l.Error().Err(err).Msg("load config from file failed")
 			os.Exit(1)
