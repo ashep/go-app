@@ -41,7 +41,7 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		ll = zerolog.DebugLevel
 	}
 
-	l := log.Logger.Level(ll).With().Str("app", name).Str("app_ver", app_v).Logger()
+	l := log.Logger.Level(ll).With().Str("app", name).Str("app_v", app_v).Logger()
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice { // Terminal
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
