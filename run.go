@@ -30,13 +30,18 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		name = "app"
 	}
 
+	app_v := "unknown"
+	if v := os.Getenv("APP_VERSION"); v != "" {
+		app_v = v
+	}
+
 	ll := zerolog.InfoLevel
 	dbg := os.Getenv("APP_DEBUG")
 	if dbg == "true" || dbg == "1" {
 		ll = zerolog.DebugLevel
 	}
 
-	l := log.Logger.Level(ll).With().Str("app", name).Logger()
+	l := log.Logger.Level(ll).With().Str("app", name).Str("app_ver", app_v).Logger()
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice { // Terminal
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
