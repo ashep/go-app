@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -46,7 +47,9 @@ func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 		l.Debug().Str("path", cfgPath).Msg("config loaded from file")
 	}
 
-	if err := cfgloader.LoadFromEnv(appName, &cfg); err != nil {
+	appEnvCfgName := strings.ReplaceAll(appName, "-", "_")
+	appEnvCfgName = strings.ReplaceAll(appEnvCfgName, ".", "_")
+	if err := cfgloader.LoadFromEnv(appEnvCfgName, &cfg); err != nil {
 		l.Error().Err(err).Msg("load config from env failed")
 		os.Exit(1)
 	}
