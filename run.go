@@ -13,27 +13,19 @@ import (
 	"github.com/ashep/go-cfgloader"
 )
 
+var (
+	appName = "app"
+	appVer  = "unknown"
+)
+
 type App interface {
 	Run(ctx context.Context, args []string) error
 }
 
 type factory[AT App, CT any] func(cfg CT, l zerolog.Logger) AT
 
-func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
+func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 	time.Local = time.UTC
-
-	if n := os.Getenv("APP_NAME"); n != "" {
-		name = n
-	}
-
-	if name == "" {
-		name = "app"
-	}
-
-	app_v := "unknown"
-	if v := os.Getenv("APP_VERSION"); v != "" {
-		app_v = v
-	}
 
 	ll := zerolog.InfoLevel
 	dbg := os.Getenv("APP_DEBUG")
@@ -41,7 +33,7 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		ll = zerolog.DebugLevel
 	}
 
-	l := log.Logger.Level(ll).With().Str("app", name).Str("app_v", app_v).Logger()
+	l := log.Logger.Level(ll).With().Str("app", appName).Str("app_v", appVer).Logger()
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice { // Terminal
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
@@ -54,7 +46,7 @@ func Run[AT App, CT any](name string, f factory[AT, CT], cfg CT) {
 		l.Debug().Str("path", cfgPath).Msg("config loaded from file")
 	}
 
-	if err := cfgloader.LoadFromEnv(name, &cfg); err != nil {
+	if err := cfgloader.LoadFromEnv(appName, &cfg); err != nil {
 		l.Error().Err(err).Msg("load config from env failed")
 		os.Exit(1)
 	}
