@@ -43,7 +43,7 @@ func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 	for _, base := range []string{"config", appName} {
 		for _, ext := range []string{".yaml", ".json"} {
 			cfgPath := base + ext
-			if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); !errors.Is(err, os.ErrNotExist) {
+			if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil && !errors.Is(err, os.ErrNotExist) {
 				l.Error().Err(err).Str("filename", cfgPath).Msgf("load config failed")
 				os.Exit(1)
 			}
