@@ -1,0 +1,8 @@
+on:
+  - push
+
+jobs:
+  lint:
+    uses: ashep/ci/.github/workflows/go-lint.yaml@v1
+  test:
+    uses: ashep/ci/.github/workflows/go-test.yaml@v1
