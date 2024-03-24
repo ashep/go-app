@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
@@ -39,9 +40,19 @@ func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 		l = l.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	}
 
+	for _, base := range []string{"config", appName} {
+		for _, ext := range []string{".yaml", ".json"} {
+			cfgPath := base + ext
+			if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); !errors.Is(err, os.ErrNotExist) {
+				l.Error().Err(err).Str("filename", cfgPath).Msgf("load config failed")
+				os.Exit(1)
+			}
+		}
+	}
+
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
 		if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil {
-			l.Error().Err(err).Msg("load config from file failed")
+			l.Error().Err(err).Str("path", cfgPath).Msgf("load config failed")
 			os.Exit(1)
 		}
 		l.Debug().Str("path", cfgPath).Msg("config loaded from file")
