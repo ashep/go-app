@@ -104,9 +104,9 @@ func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 
 func logFatalError(err error, isTerminal bool, l zerolog.Logger) {
 	if isTerminal {
-		fmt.Println("config validation failed:", err.Error())
+		fmt.Println(err.Error())
 	} else {
-		l.Error().Err(err).Msg("config validation failed")
+		l.Error().Err(err).Msg("")
 	}
 
 	os.Exit(1)
