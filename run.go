@@ -72,6 +72,10 @@ func Run[AT App, CT any](f factory[AT, CT], cfg CT) {
 		l.Debug().Str("path", cfgPath).Msg("config loaded from file")
 	}
 
+	if err := cfgloader.LoadFromEnv("APP", &cfg); err != nil {
+		logFatalError(fmt.Errorf("config load failed: %w", err), isTerminal, l)
+	}
+
 	appEnvCfgName := strings.ReplaceAll(appName, "-", "_")
 	appEnvCfgName = strings.ReplaceAll(appEnvCfgName, ".", "_")
 	if err := cfgloader.LoadFromEnv(appEnvCfgName, &cfg); err != nil {
