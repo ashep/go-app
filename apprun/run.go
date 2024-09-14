@@ -14,8 +14,8 @@ import (
 )
 
 var (
-	appName = "app"
-	appVer  = "unknown"
+	appName = ""
+	appVer  = ""
 )
 
 type App interface {
@@ -25,6 +25,7 @@ type App interface {
 type factory[CT any] func(cfg CT, l zerolog.Logger) (App, error)
 
 func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
+	var lg zerolog.Logger
 	time.Local = time.UTC
 
 	if l == nil {
@@ -34,13 +35,25 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 			ll = zerolog.DebugLevel
 		}
 
-		nl := log.Logger.Level(ll).With().Str("app", appName).Str("app_v", appVer).Logger()
+		nl := log.Logger.Level(ll)
 		if isTerminal() {
 			nl = nl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 		}
 
-		l = &nl
+		lg = nl
+	} else {
+		lg = *l
 	}
+
+	if appName == "" {
+		appName = os.Getenv("APP_NAME")
+	}
+
+	if appVer == "" {
+		appVer = os.Getenv("APP_VERSION")
+	}
+
+	lg = lg.With().Str("app", appName).Str("app_v", appVer).Logger()
 
 	// Try to load from "standard" paths
 	for _, base := range []string{"config", appName} {
@@ -48,22 +61,22 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 			cfgPath := base + ext
 			err := cfgloader.LoadFromPath(cfgPath, &cfg, nil)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+				lg.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 				return 1
 			}
 
-			l.Debug().Str("path", cfgPath).Msg("config file loaded")
+			lg.Debug().Str("path", cfgPath).Msg("config file loaded")
 		}
 	}
 
 	// From a path defined by an env variable
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
 		if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil {
-			l.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
+			lg.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
 			return 1
 		}
 
-		l.Debug().Str("path", cfgPath).Msg("config env loaded")
+		lg.Debug().Str("path", cfgPath).Msg("config env loaded")
 	}
 
 	ctx, ctxC := context.WithCancel(context.Background())
@@ -74,18 +87,18 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 
 	go func() {
 		s := <-sig
-		l.Info().Str("signal", s.String()).Msg("signal received")
+		lg.Info().Str("signal", s.String()).Msg("signal received")
 		ctxC()
 	}()
 
-	app, err := f(cfg, *l)
+	app, err := f(cfg, lg)
 	if err != nil {
-		l.Error().Err(err).Msg("app init failed")
+		lg.Error().Err(err).Msg("app init failed")
 		return 1
 	}
 
 	if err := app.Run(ctx); err != nil {
-		l.Error().Err(err).Msg("app run failed")
+		lg.Error().Err(err).Msg("app run failed")
 		return 1
 	}
 
