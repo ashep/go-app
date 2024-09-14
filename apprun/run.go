@@ -13,11 +13,6 @@ import (
 	"github.com/rs/zerolog"
 )
 
-var (
-	appName = ""
-	appVer  = ""
-)
-
 type Config[CT any] struct {
 	AppName   string
 	AppVer    string
@@ -33,7 +28,7 @@ type app interface {
 
 type factory[AT app, CT any] func(cfg Config[CT]) (AT, error)
 
-func Run[AT app, CT any](f factory[AT, CT], appCfg CT, lw io.Writer) int {
+func Run[AT app, CT any](f factory[AT, CT], appCfg CT, appName, appVer string, lw io.Writer) int {
 	time.Local = time.UTC
 	ll := zerolog.InfoLevel
 
