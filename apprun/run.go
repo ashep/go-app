@@ -27,13 +27,13 @@ type Config[CT any] struct {
 	App CT
 }
 
-type App interface {
+type app interface {
 	Run(context.Context) error
 }
 
-type factory[CT any] func(cfg Config[CT]) (App, error)
+type factory[AT app, CT any] func(cfg Config[CT]) (AT, error)
 
-func Run[CT any](f factory[CT], appCfg CT, lw io.Writer) int {
+func Run[AT app, CT any](f factory[AT, CT], appCfg CT, lw io.Writer) int {
 	time.Local = time.UTC
 	ll := zerolog.InfoLevel
 
@@ -108,13 +108,13 @@ func Run[CT any](f factory[CT], appCfg CT, lw io.Writer) int {
 		App:       appCfg,
 	}
 
-	app, err := f(cfg)
+	a, err := f(cfg)
 	if err != nil {
 		bl.Error().Err(err).Msg("app init failed")
 		return 1
 	}
 
-	if err := app.Run(ctx); err != nil {
+	if err := a.Run(ctx); err != nil {
 		bl.Error().Err(err).Msg("app run failed")
 		return 1
 	}
