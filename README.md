@@ -1,3 +1,3 @@
 # go-apprun
 
-Generic Go application runner
+Generic Go application runner.

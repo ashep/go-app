@@ -22,7 +22,7 @@ type App[CT any] interface {
 	Run(context.Context) error
 }
 
-type factory[CT any] func(cfg CT, l zerolog.Logger) App[CT]
+type factory[CT any] func(cfg CT, l zerolog.Logger) (App[CT], error)
 
 func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 	time.Local = time.UTC
@@ -78,7 +78,13 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 		ctxC()
 	}()
 
-	if err := f(cfg, *l).Run(ctx); err != nil {
+	app, err := f(cfg, *l)
+	if err != nil {
+		l.Error().Err(err).Msg("app init failed")
+		return 1
+	}
+
+	if err := app.Run(ctx); err != nil {
 		l.Error().Err(err).Msg("app run failed")
 		return 1
 	}
