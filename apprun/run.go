@@ -18,11 +18,11 @@ var (
 	appVer  = "unknown"
 )
 
-type App[CT any] interface {
+type App interface {
 	Run(context.Context) error
 }
 
-type factory[CT any] func(cfg CT, l zerolog.Logger) (App[CT], error)
+type factory[CT any] func(cfg CT, l zerolog.Logger) (App, error)
 
 func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 	time.Local = time.UTC
