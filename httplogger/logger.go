@@ -59,6 +59,8 @@ func (l *writer) Write(b []byte) (int, error) {
 		req.SetBasicAuth(l.un, l.pw)
 	}
 
+	req.Header.Set("Content-Type", "application/json")
+
 	res, err := l.c.Do(req)
 	if err != nil {
 		return 0, fmt.Errorf("could not send request: %w", err)
