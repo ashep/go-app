@@ -36,9 +36,9 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 		}
 
 		nl := log.Logger.Level(ll)
-		if isTerminal() {
-			nl = nl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-		}
+		// if isTerminal() {
+		// 	nl = nl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+		// }
 
 		lg = nl
 	} else {
@@ -105,10 +105,10 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 	return 0
 }
 
-func isTerminal() bool {
-	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
-		return true
-	}
-
-	return false
-}
+// func isTerminal() bool {
+// 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
+// 		return true
+// 	}
+//
+// 	return false
+// }

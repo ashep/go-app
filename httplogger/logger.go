@@ -3,6 +3,7 @@ package httplogger
 import (
 	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 
@@ -14,11 +15,11 @@ type httpClient interface {
 }
 
 type writer struct {
-	l  zerolog.Logger
-	u  string
-	un string
-	pw string
-	c  httpClient
+	pwr io.Writer
+	u   string
+	un  string
+	pw  string
+	c   httpClient
 }
 
 func New(l zerolog.Logger, u, username, password string, c httpClient) (zerolog.Logger, error) {
@@ -35,18 +36,18 @@ func New(l zerolog.Logger, u, username, password string, c httpClient) (zerolog.
 	}
 
 	wr := &writer{
-		l:  l,
-		u:  u,
-		un: username,
-		pw: password,
-		c:  c,
+		pwr: l,
+		u:   u,
+		un:  username,
+		pw:  password,
+		c:   c,
 	}
 
 	return l.Output(wr), nil
 }
 
 func (l *writer) Write(b []byte) (int, error) {
-	if n, err := l.l.Write(b); err != nil {
+	if n, err := l.pwr.Write(b); err != nil {
 		return n, err
 	}
 
