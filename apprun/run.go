@@ -3,6 +3,7 @@ package apprun
 import (
 	"context"
 	"errors"
+	"io"
 	"os"
 	"os/signal"
 	"syscall"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ashep/go-cfgloader"
 	"github.com/rs/zerolog"
-	"github.com/rs/zerolog/log"
 )
 
 var (
@@ -18,31 +18,36 @@ var (
 	appVer  = ""
 )
 
+type Config[CT any] struct {
+	AppName   string
+	AppVer    string
+	LogLevel  zerolog.Level
+	LogWriter io.Writer
+
+	App CT
+}
+
 type App interface {
 	Run(context.Context) error
 }
 
-type factory[CT any] func(cfg CT, l zerolog.Logger) (App, error)
+type factory[CT any] func(cfg Config[CT]) (App, error)
 
-func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
-	var lg zerolog.Logger
+func Run[CT any](f factory[CT], appCfg CT, lw io.Writer) int {
 	time.Local = time.UTC
+	ll := zerolog.InfoLevel
 
-	if l == nil {
-		ll := zerolog.InfoLevel
-		dbg := os.Getenv("APP_DEBUG")
-		if dbg == "true" || dbg == "1" {
-			ll = zerolog.DebugLevel
+	dbg := os.Getenv("APP_DEBUG")
+	if dbg == "true" || dbg == "1" {
+		ll = zerolog.DebugLevel
+	}
+
+	if lw == nil {
+		if isTerminal() {
+			lw = zerolog.ConsoleWriter{Out: os.Stderr}
+		} else {
+			lw = os.Stderr
 		}
-
-		nl := log.Logger.Level(ll)
-		// if isTerminal() {
-		// 	nl = nl.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-		// }
-
-		lg = nl
-	} else {
-		lg = *l
 	}
 
 	if appName == "" {
@@ -53,30 +58,31 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 		appVer = os.Getenv("APP_VERSION")
 	}
 
-	lg = lg.With().Str("app", appName).Str("app_v", appVer).Logger()
+	// Bootstrap logger, use only in this func
+	bl := zerolog.New(lw).With().Str("app", appName).Str("app_v", appVer).Logger()
 
 	// Try to load from "standard" paths
 	for _, base := range []string{"config", appName} {
 		for _, ext := range []string{".yaml", ".json"} {
 			cfgPath := base + ext
-			err := cfgloader.LoadFromPath(cfgPath, &cfg, nil)
+			err := cfgloader.LoadFromPath(cfgPath, &appCfg, nil)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				lg.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+				bl.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 				return 1
 			}
 
-			lg.Debug().Str("path", cfgPath).Msg("config file loaded")
+			bl.Debug().Str("path", cfgPath).Msg("config file loaded")
 		}
 	}
 
 	// From a path defined by an env variable
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
-		if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil {
-			lg.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
+		if err := cfgloader.LoadFromPath(cfgPath, &appCfg, nil); err != nil {
+			bl.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
 			return 1
 		}
 
-		lg.Debug().Str("path", cfgPath).Msg("config env loaded")
+		bl.Debug().Str("path", cfgPath).Msg("config env loaded")
 	}
 
 	ctx, ctxC := context.WithCancel(context.Background())
@@ -87,28 +93,36 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 
 	go func() {
 		s := <-sig
-		lg.Info().Str("signal", s.String()).Msg("signal received")
+		bl.Info().Str("signal", s.String()).Msg("signal received")
 		ctxC()
 	}()
 
-	app, err := f(cfg, lg)
+	cfg := Config[CT]{
+		AppName:   appName,
+		AppVer:    appVer,
+		LogLevel:  ll,
+		LogWriter: lw,
+		App:       appCfg,
+	}
+
+	app, err := f(cfg)
 	if err != nil {
-		lg.Error().Err(err).Msg("app init failed")
+		bl.Error().Err(err).Msg("app init failed")
 		return 1
 	}
 
 	if err := app.Run(ctx); err != nil {
-		lg.Error().Err(err).Msg("app run failed")
+		bl.Error().Err(err).Msg("app run failed")
 		return 1
 	}
 
 	return 0
 }
 
-// func isTerminal() bool {
-// 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
-// 		return true
-// 	}
-//
-// 	return false
-// }
+func isTerminal() bool {
+	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
+		return true
+	}
+
+	return false
+}
