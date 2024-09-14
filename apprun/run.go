@@ -59,9 +59,8 @@ func Run[CT any](f factory[CT], appCfg CT, lw io.Writer) int {
 	}
 
 	// Bootstrap logger, use only in this func
-	bl := zerolog.New(lw).With().Str("app", appName).Str("app_v", appVer).Logger()
+	bl := zerolog.New(lw).Level(ll).With().Str("app", appName).Str("app_v", appVer).Logger()
 
-	// Try to load from "standard" paths
 	for _, base := range []string{"config", appName} {
 		for _, ext := range []string{".yaml", ".json"} {
 			cfgPath := base + ext
@@ -69,20 +68,24 @@ func Run[CT any](f factory[CT], appCfg CT, lw io.Writer) int {
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				bl.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 				return 1
+			} else if err == nil {
+				bl.Debug().Str("path", cfgPath).Msg("config file loaded")
 			}
-
-			bl.Debug().Str("path", cfgPath).Msg("config file loaded")
 		}
 	}
 
-	// From a path defined by an env variable
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
 		if err := cfgloader.LoadFromPath(cfgPath, &appCfg, nil); err != nil {
-			bl.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
+			bl.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 			return 1
 		}
 
-		bl.Debug().Str("path", cfgPath).Msg("config env loaded")
+		bl.Debug().Str("path", cfgPath).Msg("config file loaded")
+	}
+
+	if err := cfgloader.LoadFromEnv("APP", &appCfg); err != nil {
+		bl.Error().Err(err).Msg("load config from env vars failed")
+		return 1
 	}
 
 	ctx, ctxC := context.WithCancel(context.Background())
