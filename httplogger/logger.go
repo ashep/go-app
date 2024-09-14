@@ -1,9 +1,8 @@
-package zerologhttpwriter
+package httplogger
 
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 
@@ -14,33 +13,39 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type Logger struct {
-	l zerolog.Logger
-	u string
-	c httpClient
+type writer struct {
+	l  zerolog.Logger
+	u  string
+	un string
+	pw string
+	c  httpClient
 }
 
-func New(l zerolog.Logger, u string, c httpClient) (io.Writer, error) {
+func New(l zerolog.Logger, u, username, password string, c httpClient) (zerolog.Logger, error) {
 	if u == "" {
-		return nil, fmt.Errorf("empty url")
+		return l, fmt.Errorf("empty url")
 	}
 
 	if _, err := url.Parse(u); err != nil {
-		return nil, fmt.Errorf("invalid url: %w", err)
+		return l, fmt.Errorf("invalid url: %w", err)
 	}
 
 	if c == nil {
-		return nil, fmt.Errorf("nil http client")
+		c = &http.Client{}
 	}
 
-	return &Logger{
-		l: l,
-		u: u,
-		c: c,
-	}, nil
+	wr := &writer{
+		l:  l,
+		u:  u,
+		un: username,
+		pw: password,
+		c:  c,
+	}
+
+	return l.Output(wr), nil
 }
 
-func (l *Logger) Write(b []byte) (int, error) {
+func (l *writer) Write(b []byte) (int, error) {
 	if n, err := l.l.Write(b); err != nil {
 		return n, err
 	}
@@ -48,6 +53,10 @@ func (l *Logger) Write(b []byte) (int, error) {
 	req, err := http.NewRequest(http.MethodPost, l.u, bytes.NewReader(b))
 	if err != nil {
 		return 0, fmt.Errorf("could not create request: %w", err)
+	}
+
+	if l.un != "" {
+		req.SetBasicAuth(l.un, l.pw)
 	}
 
 	res, err := l.c.Do(req)

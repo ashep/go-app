@@ -2,16 +2,15 @@ package apprun
 
 import (
 	"context"
+	"errors"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/ashep/go-cfgloader"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
-
-	"github.com/ashep/go-apprun/option"
-	"github.com/ashep/go-apprun/runner"
 )
 
 var (
@@ -20,12 +19,12 @@ var (
 )
 
 type App[CT any] interface {
-	Run(context.Context, CT, zerolog.Logger) error
+	Run(context.Context) error
 }
 
-type factory[CT any] func() App[CT]
+type factory[CT any] func(cfg CT, l zerolog.Logger) App[CT]
 
-func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger, opts ...option.Option[CT]) int {
+func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger) int {
 	time.Local = time.UTC
 
 	if l == nil {
@@ -43,6 +42,30 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger, opts ...option.Option
 		l = &nl
 	}
 
+	// Try to load from "standard" paths
+	for _, base := range []string{"config", appName} {
+		for _, ext := range []string{".yaml", ".json"} {
+			cfgPath := base + ext
+			err := cfgloader.LoadFromPath(cfgPath, &cfg, nil)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
+				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+				return 1
+			}
+
+			l.Debug().Str("path", cfgPath).Msg("config file loaded")
+		}
+	}
+
+	// From a path defined by an env variable
+	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
+		if err := cfgloader.LoadFromPath(cfgPath, &cfg, nil); err != nil {
+			l.Error().Err(err).Str("path", cfgPath).Msg("config envs load failed")
+			return 1
+		}
+
+		l.Debug().Str("path", cfgPath).Msg("config env loaded")
+	}
+
 	ctx, ctxC := context.WithCancel(context.Background())
 	defer ctxC()
 
@@ -55,20 +78,8 @@ func Run[CT any](f factory[CT], cfg CT, l *zerolog.Logger, opts ...option.Option
 		ctxC()
 	}()
 
-	r := &runner.Runner[CT]{
-		Config: cfg,
-		Logger: *l,
-	}
-
-	for _, opt := range opts {
-		if err := opt(ctx, r); err != nil {
-			r.Logger.Error().Err(err).Msg("failed to apply option")
-			return 1
-		}
-	}
-
-	if err := f().Run(ctx, r.Config, r.Logger); err != nil {
-		r.Logger.Error().Err(err).Msg("")
+	if err := f(cfg, *l).Run(ctx); err != nil {
+		l.Error().Err(err).Msg("app run failed")
 		return 1
 	}
 
