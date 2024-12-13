@@ -31,14 +31,14 @@ type runnable interface {
 	Run(context.Context) error
 }
 
-type appFactory[CT any] func(cfg CT, rt Runtime) (runnable, error)
+type appFactory[CT any] func(cfg CT, rt *Runtime) (runnable, error)
 
 type Runner[CT any] struct {
 	cfg CT
 	fct appFactory[CT]
 	lw  []io.Writer
 	srv *http.Server
-	rt  Runtime
+	rt  *Runtime
 }
 
 func New[CT any](cfg CT, fct appFactory[CT]) *Runner[CT] {
