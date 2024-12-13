@@ -27,11 +27,11 @@ type Runtime struct {
 	SrvMux     *http.ServeMux
 }
 
-type runnable interface {
+type Runnable interface {
 	Run(context.Context) error
 }
 
-type appFactory[CT any] func(cfg CT, rt *Runtime) (runnable, error)
+type appFactory[CT any] func(cfg CT, rt *Runtime) (Runnable, error)
 
 type Runner[CT any] struct {
 	cfg CT
