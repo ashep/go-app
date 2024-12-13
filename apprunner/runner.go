@@ -91,6 +91,7 @@ func (r *Runner[CT]) WithHTTPServer(s *http.Server) *Runner[CT] {
 	}
 
 	r.rt.SrvMux = http.NewServeMux()
+	s.Handler = r.rt.SrvMux
 	r.srv = s
 
 	return r
