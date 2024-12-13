@@ -72,7 +72,7 @@ func New[CT any](cfg CT, fct appFactory[CT]) *Runner[CT] {
 		cfg: cfg,
 		fct: fct,
 		lw:  logWriters,
-		rt: Runtime{
+		rt: &Runtime{
 			AppName:    appName,
 			AppVersion: appVer,
 			Logger:     l,
@@ -165,12 +165,19 @@ func (r *Runner[CT]) Run() int {
 
 	if r.srv != nil {
 		go func() {
-			r.rt.Logger.Info().Str("addr", r.srv.Addr).Msg("http server starting")
-
+			r.rt.Logger.Info().Str("addr", r.srv.Addr).Msg("http server is starting")
 			if err := r.srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 				r.rt.Logger.Info().Msg("http server closed")
 			} else if err != nil {
 				r.rt.Logger.Error().Err(err).Msg("http server serve failed")
+			}
+		}()
+
+		go func() {
+			<-ctx.Done()
+			r.rt.Logger.Info().Msg("http server is shutting down")
+			if err := r.srv.Shutdown(context.Background()); err != nil {
+				r.rt.Logger.Error().Err(err).Msg("http server shutdown failed")
 			}
 		}()
 	}
