@@ -172,19 +172,18 @@ func (r *Runner[CT]) Run() int {
 				r.rt.Logger.Error().Err(err).Msg("http server serve failed")
 			}
 		}()
-
-		go func() {
-			<-ctx.Done()
-			r.rt.Logger.Info().Msg("http server is shutting down")
-			if err := r.srv.Shutdown(context.Background()); err != nil {
-				r.rt.Logger.Error().Err(err).Msg("http server shutdown failed")
-			}
-		}()
 	}
 
 	if err := app.Run(ctx); err != nil {
 		r.rt.Logger.Error().Err(err).Msg("app run failed")
 		return 1
+	}
+
+	if r.srv != nil {
+		r.rt.Logger.Info().Msg("http server is shutting down")
+		if err := r.srv.Shutdown(context.Background()); err != nil {
+			r.rt.Logger.Error().Err(err).Msg("http server shutdown failed")
+		}
 	}
 
 	return 0
