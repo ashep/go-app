@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 )
 
 type httpClient interface {
@@ -18,7 +19,7 @@ type Writer struct {
 	c      httpClient
 }
 
-func New(u, user, passwd string, c httpClient) (*Writer, error) {
+func New(u, user, passwd string) (*Writer, error) {
 	if u == "" {
 		return nil, fmt.Errorf("empty url")
 	}
@@ -27,16 +28,29 @@ func New(u, user, passwd string, c httpClient) (*Writer, error) {
 		return nil, fmt.Errorf("invalid url: %w", err)
 	}
 
-	if c == nil {
-		c = &http.Client{}
-	}
-
 	return &Writer{
 		u:      u,
 		user:   user,
 		passwd: passwd,
-		c:      c,
+		c:      http.DefaultClient,
 	}, nil
+}
+
+func NewFromEnv() (*Writer, error) {
+	return New(
+		os.Getenv("APP_LOG_SERVER_URL"),
+		os.Getenv("APP_LOG_SERVER_USER"),
+		os.Getenv("APP_LOG_SERVER_PASSWORD"),
+	)
+}
+
+func MustNewFromEnv() *Writer {
+	w, err := NewFromEnv()
+	if err != nil {
+		panic(fmt.Errorf("failed to create http log writer: %w", err))
+	}
+
+	return w
 }
 
 func (l *Writer) Write(b []byte) (int, error) {
