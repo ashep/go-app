@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ashep/go-apprun/metrics"
 	"github.com/ashep/go-cfgloader"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -112,6 +113,9 @@ func (r *Runner[CT]) WithMetricsHandler() *Runner[CT] {
 	if r.srv == nil {
 		panic("http server is not set")
 	}
+
+	metrics.SetAppName(r.rt.AppName)
+	metrics.SetAppVersion(r.rt.AppVersion)
 
 	r.rt.SrvMux.Handle("/metrics", promhttp.Handler())
 

@@ -13,11 +13,22 @@ import (
 )
 
 var (
+	appName    string
+	appVersion string
+
 	mux = sync.RWMutex{}
 
 	counters   = make(map[string]*prometheus.CounterVec)
 	histograms = make(map[string]*prometheus.HistogramVec)
 )
+
+func SetAppName(name string) {
+	appName = name
+}
+
+func SetAppVersion(version string) {
+	appVersion = version
+}
 
 func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
 	lbs := prometheus.Labels{
@@ -25,6 +36,14 @@ func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
 		"host":   req.Host,
 		"path":   req.URL.Path,
 		"code":   "",
+	}
+
+	if appName != "" {
+		lbs["app"] = appName
+	}
+
+	if appVersion != "" {
+		lbs["app_v"] = appVersion
 	}
 
 	if labels != nil {
@@ -45,6 +64,14 @@ func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
 }
 
 func Counter(name, help string, labels prometheus.Labels) *prometheus.CounterVec {
+	if appName != "" {
+		labels["app"] = appName
+	}
+
+	if appVersion != "" {
+		labels["app_v"] = appVersion
+	}
+
 	k := metricKey(name, labels)
 
 	mux.RLock()

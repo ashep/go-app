@@ -44,15 +44,6 @@ func NewFromEnv() (*Writer, error) {
 	)
 }
 
-func MustNewFromEnv() *Writer {
-	w, err := NewFromEnv()
-	if err != nil {
-		panic(fmt.Errorf("failed to create http log writer: %w", err))
-	}
-
-	return w
-}
-
 func (l *Writer) Write(b []byte) (int, error) {
 	req, err := http.NewRequest(http.MethodPost, l.u, bytes.NewReader(b))
 	if err != nil {
