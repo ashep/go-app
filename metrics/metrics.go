@@ -46,10 +46,8 @@ func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
 		lbs["app_v"] = appVersion
 	}
 
-	if labels != nil {
-		for k, v := range labels {
-			lbs[k] = v
-		}
+	for k, v := range labels {
+		lbs[k] = v
 	}
 
 	cnt := Counter("http_server_requests_total", "Total number of HTTP server requests", lbs)

@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ashep/go-apprun/metrics"
+	"github.com/ashep/go-app/metrics"
 	"github.com/ashep/go-cfgloader"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"

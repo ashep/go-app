@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/ashep/go-apprun/httplogwriter"
+	"github.com/ashep/go-app/httplogwriter"
 )
 
 func TestWriter_New(tt *testing.T) {
