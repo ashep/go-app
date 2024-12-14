@@ -1,4 +1,4 @@
-package apprunner
+package runner
 
 import (
 	"context"
@@ -32,17 +32,17 @@ type Runnable interface {
 	Run(context.Context) error
 }
 
-type appFactory[CT any] func(cfg CT, rt *Runtime) (Runnable, error)
+type appFactory[RT Runnable, CT any] func(cfg CT, rt *Runtime) (RT, error)
 
-type Runner[CT any] struct {
+type Runner[RT Runnable, CT any] struct {
 	cfg CT
-	fct appFactory[CT]
+	fct appFactory[RT, CT]
 	lw  []io.Writer
 	srv *http.Server
 	rt  *Runtime
 }
 
-func New[CT any](cfg CT, fct appFactory[CT]) *Runner[CT] {
+func New[RT Runnable, CT any](cfg CT, fct appFactory[RT, CT]) *Runner[RT, CT] {
 	time.Local = time.UTC
 	logLevel := zerolog.InfoLevel
 
@@ -69,7 +69,7 @@ func New[CT any](cfg CT, fct appFactory[CT]) *Runner[CT] {
 	l := zerolog.New(zerolog.MultiLevelWriter(logWriters...)).Level(logLevel).
 		With().Str("app", appName).Str("app_v", appVer).Logger()
 
-	return &Runner[CT]{
+	return &Runner[RT, CT]{
 		cfg: cfg,
 		fct: fct,
 		lw:  logWriters,
@@ -81,12 +81,12 @@ func New[CT any](cfg CT, fct appFactory[CT]) *Runner[CT] {
 	}
 }
 
-func (r *Runner[CT]) WithLogWriter(w io.Writer) *Runner[CT] {
+func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
 	r.lw = append(r.lw, w)
 	return r
 }
 
-func (r *Runner[CT]) WithHTTPServer(s *http.Server) *Runner[CT] {
+func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 	if r.srv != nil {
 		panic("http server is already set")
 	}
@@ -98,7 +98,7 @@ func (r *Runner[CT]) WithHTTPServer(s *http.Server) *Runner[CT] {
 	return r
 }
 
-func (r *Runner[CT]) WithDefaultHTPServer() *Runner[CT] {
+func (r *Runner[RT, CT]) WithDefaultHTPServer() *Runner[RT, CT] {
 	addr := os.Getenv("APP_HTTP_SERVER_ADDR")
 	if addr == "" {
 		addr = ":9000"
@@ -109,7 +109,7 @@ func (r *Runner[CT]) WithDefaultHTPServer() *Runner[CT] {
 	})
 }
 
-func (r *Runner[CT]) WithMetricsHandler() *Runner[CT] {
+func (r *Runner[RT, CT]) WithMetricsHandler() *Runner[RT, CT] {
 	if r.srv == nil {
 		panic("http server is not set")
 	}
@@ -122,7 +122,7 @@ func (r *Runner[CT]) WithMetricsHandler() *Runner[CT] {
 	return r
 }
 
-func (r *Runner[CT]) Run() int {
+func (r *Runner[RT, CT]) Run() int {
 	for _, base := range []string{"config", appName} {
 		for _, ext := range []string{".yaml", ".json"} {
 			cfgPath := base + ext
