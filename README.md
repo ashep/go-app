@@ -1,3 +1,3 @@
-# go-apprun
+# go-app
 
-Generic Go application runner.
+Go application essentials.
