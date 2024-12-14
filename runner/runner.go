@@ -42,7 +42,7 @@ type Runner[RT Runnable, CT any] struct {
 	rt  *Runtime
 }
 
-func New[RT Runnable, CT any](cfg CT, fct appFactory[RT, CT]) *Runner[RT, CT] {
+func New[RT Runnable, CT any](fct appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 	time.Local = time.UTC
 	logLevel := zerolog.InfoLevel
 
