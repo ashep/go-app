@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ashep/go-app/httplogwriter"
 	"github.com/ashep/go-app/metrics"
 	"github.com/ashep/go-cfgloader"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -24,8 +25,8 @@ var (
 type Runtime struct {
 	AppName    string
 	AppVersion string
-	Logger     zerolog.Logger
 	SrvMux     *http.ServeMux
+	Logger     zerolog.Logger
 }
 
 type Runnable interface {
@@ -35,16 +36,28 @@ type Runnable interface {
 type appFactory[RT Runnable, CT any] func(cfg CT, rt *Runtime) (RT, error)
 
 type Runner[RT Runnable, CT any] struct {
-	cfg CT
-	fct appFactory[RT, CT]
-	lw  []io.Writer
-	srv *http.Server
-	rt  *Runtime
+	appName    string
+	appVer     string
+	cfg        CT
+	appFactory appFactory[RT, CT]
+	srvMux     *http.ServeMux
+	srv        *http.Server
+	logLevel   zerolog.Level
+	logWriters []io.Writer
+	bsLog      zerolog.Logger // bootstrap logger, used until Run called
 }
 
-func New[RT Runnable, CT any](fct appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
+func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 	time.Local = time.UTC
 	logLevel := zerolog.InfoLevel
+
+	if appName == "" {
+		appName = os.Getenv("APP_NAME")
+	}
+
+	if appVer == "" {
+		appVer = os.Getenv("APP_VERSION")
+	}
 
 	dbg := os.Getenv("APP_DEBUG")
 	if dbg == "true" || dbg == "1" {
@@ -58,41 +71,47 @@ func New[RT Runnable, CT any](fct appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 		logWriters = append(logWriters, os.Stderr)
 	}
 
-	if appName == "" {
-		appName = os.Getenv("APP_NAME")
-	}
-
-	if appVer == "" {
-		appVer = os.Getenv("APP_VERSION")
-	}
-
-	l := zerolog.New(zerolog.MultiLevelWriter(logWriters...)).Level(logLevel).
+	bsLog := zerolog.New(zerolog.MultiLevelWriter(logWriters...)).Level(logLevel).
 		With().Str("app", appName).Str("app_v", appVer).Logger()
 
 	return &Runner[RT, CT]{
-		cfg: cfg,
-		fct: fct,
-		lw:  logWriters,
-		rt: &Runtime{
-			AppName:    appName,
-			AppVersion: appVer,
-			Logger:     l,
-		},
+		appName:    appName,
+		appVer:     appVer,
+		cfg:        cfg,
+		appFactory: f,
+		logLevel:   logLevel,
+		logWriters: logWriters,
+		bsLog:      bsLog,
 	}
 }
 
 func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
-	r.lw = append(r.lw, w)
+	r.logWriters = append(r.logWriters, w)
 	return r
+}
+
+func (r *Runner[RT, CT]) WithHTTPLogWriterFromEnv(must bool) *Runner[RT, CT] {
+	w, err := httplogwriter.NewFromEnv()
+	if err != nil {
+		if must {
+			r.bsLog.Error().Err(err).Msg("error setting up http log writer")
+			os.Exit(1)
+		}
+		r.bsLog.Warn().Err(err).Msg("http log writer has not been set up")
+		return r
+	}
+
+	return r.WithLogWriter(w)
 }
 
 func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 	if r.srv != nil {
-		panic("http server is already set")
+		r.bsLog.Error().Msg("http server is already set")
+		os.Exit(1)
 	}
 
-	r.rt.SrvMux = http.NewServeMux()
-	s.Handler = r.rt.SrvMux
+	r.srvMux = http.NewServeMux()
+	s.Handler = r.srvMux
 	r.srv = s
 
 	return r
@@ -114,49 +133,59 @@ func (r *Runner[RT, CT]) WithMetricsHandler() *Runner[RT, CT] {
 		panic("http server is not set")
 	}
 
-	metrics.SetAppName(r.rt.AppName)
-	metrics.SetAppVersion(r.rt.AppVersion)
+	metrics.SetAppName(r.appName)
+	metrics.SetAppVersion(r.appVer)
 
-	r.rt.SrvMux.Handle("/metrics", promhttp.Handler())
+	r.srvMux.Handle("/metrics", promhttp.Handler())
 
 	return r
 }
 
-func (r *Runner[RT, CT]) Run() int {
+func (r *Runner[RT, CT]) Run() {
+	l := zerolog.New(zerolog.MultiLevelWriter(r.logWriters...)).Level(r.logLevel).
+		With().Str("app", appName).Str("app_v", appVer).Logger()
+
 	for _, base := range []string{"config", appName} {
 		for _, ext := range []string{".yaml", ".json"} {
 			cfgPath := base + ext
 			err := cfgloader.LoadFromPath(cfgPath, &r.cfg, nil)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
-				r.rt.Logger.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
-				return 1
+				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+				os.Exit(1)
 			} else if err == nil {
-				r.rt.Logger.Debug().Str("path", cfgPath).Msg("config file loaded")
+				l.Debug().Str("path", cfgPath).Msg("config file loaded")
 			}
 		}
 	}
 
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
 		if err := cfgloader.LoadFromPath(cfgPath, &r.cfg, nil); err != nil {
-			r.rt.Logger.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
-			return 1
+			l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+			os.Exit(1)
 		}
 
-		r.rt.Logger.Debug().Str("path", cfgPath).Msg("config file loaded")
+		l.Debug().Str("path", cfgPath).Msg("config file loaded")
 	}
 
 	if err := cfgloader.LoadFromEnv("APP", &r.cfg); err != nil {
-		r.rt.Logger.Error().Err(err).Msg("load config from env vars failed")
-		return 1
+		l.Error().Err(err).Msg("load config from env vars failed")
+		os.Exit(1)
 	}
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
-	app, err := r.fct(r.cfg, r.rt)
+	rt := &Runtime{
+		AppName:    r.appName,
+		AppVersion: r.appVer,
+		SrvMux:     r.srvMux,
+		Logger:     l,
+	}
+
+	app, err := r.appFactory(r.cfg, rt)
 	if err != nil {
-		r.rt.Logger.Error().Err(err).Msg("app init failed")
-		return 1
+		l.Error().Err(err).Msg("app init failed")
+		os.Exit(1)
 	}
 
 	ctx, ctxC := context.WithCancel(context.Background())
@@ -164,40 +193,37 @@ func (r *Runner[RT, CT]) Run() int {
 
 	go func() {
 		s := <-sig
-		r.rt.Logger.Info().Str("signal", s.String()).Msg("signal received")
+		l.Info().Str("signal", s.String()).Msg("signal received")
 		ctxC()
 	}()
 
 	if r.srv != nil {
 		go func() {
-			r.rt.Logger.Info().Str("addr", r.srv.Addr).Msg("http server is starting")
+			l.Info().Str("addr", r.srv.Addr).Msg("http server is starting")
 			if err := r.srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
-				r.rt.Logger.Info().Msg("http server closed")
+				l.Info().Msg("http server closed")
 			} else if err != nil {
-				r.rt.Logger.Error().Err(err).Msg("http server serve failed")
+				l.Error().Err(err).Msg("http server serve failed")
 			}
 		}()
 	}
 
 	if err := app.Run(ctx); err != nil {
-		r.rt.Logger.Error().Err(err).Msg("app run failed")
-		return 1
+		l.Error().Err(err).Msg("app run failed")
+		os.Exit(1)
 	}
 
 	if r.srv != nil {
-		r.rt.Logger.Info().Msg("http server is shutting down")
+		l.Info().Msg("http server is shutting down")
 		if err := r.srv.Shutdown(context.Background()); err != nil {
-			r.rt.Logger.Error().Err(err).Msg("http server shutdown failed")
+			l.Error().Err(err).Msg("http server shutdown failed")
 		}
 	}
-
-	return 0
 }
 
 func isTerminal() bool {
 	if o, _ := os.Stdout.Stat(); (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		return true
 	}
-
 	return false
 }
