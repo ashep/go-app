@@ -30,11 +30,11 @@ func SetAppVersion(version string) {
 	appVersion = version
 }
 
-func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
+func HTTPServerRequest(req *http.Request, path string) func(int) {
 	lbs := prometheus.Labels{
 		"method": req.Method,
 		"host":   req.Host,
-		"path":   req.URL.Path,
+		"path":   path,
 		"code":   "",
 	}
 
@@ -46,17 +46,36 @@ func HTTPServerRequest(req *http.Request, labels prometheus.Labels) func(int) {
 		lbs["app_v"] = appVersion
 	}
 
-	for k, v := range labels {
-		lbs[k] = v
-	}
-
-	cnt := Counter("http_server_requests_total", "Total number of HTTP server requests", lbs)
 	dur := Histogram("http_server_request_duration_seconds", "HTTP server request duration.", lbs)
 
 	start := time.Now()
 	return func(statusCode int) {
 		lbs["code"] = strconv.Itoa(statusCode)
-		cnt.With(lbs).Inc()
+		dur.With(lbs).Observe(time.Since(start).Seconds())
+	}
+}
+
+func HTTPClientRequest(req *http.Request, path string) func(int) {
+	lbs := prometheus.Labels{
+		"method": req.Method,
+		"host":   req.Host,
+		"path":   path,
+		"code":   "",
+	}
+
+	if appName != "" {
+		lbs["app"] = appName
+	}
+
+	if appVersion != "" {
+		lbs["app_v"] = appVersion
+	}
+
+	dur := Histogram("http_client_request_duration_seconds", "HTTP server request duration.", lbs)
+
+	start := time.Now()
+	return func(statusCode int) {
+		lbs["code"] = strconv.Itoa(statusCode)
 		dur.With(lbs).Observe(time.Since(start).Seconds())
 	}
 }

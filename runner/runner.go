@@ -90,7 +90,7 @@ func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
 	return r
 }
 
-func (r *Runner[RT, CT]) WithHTTPLogWriterFromEnv(must bool) *Runner[RT, CT] {
+func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter(must bool) *Runner[RT, CT] {
 	w, err := httplogwriter.NewFromEnv()
 	if err != nil {
 		if must {
