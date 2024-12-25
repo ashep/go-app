@@ -38,9 +38,9 @@ func New(u, user, passwd string) (*Writer, error) {
 
 func NewFromEnv() (*Writer, error) {
 	return New(
-		os.Getenv("APP_LOG_SERVER_URL"),
-		os.Getenv("APP_LOG_SERVER_USER"),
-		os.Getenv("APP_LOG_SERVER_PASSWORD"),
+		os.Getenv("APP_LOGSERVER_URL"),
+		os.Getenv("APP_LOGSERVER_USER"),
+		os.Getenv("APP_LOGSERVER_PASSWORD"),
 	)
 }
 
