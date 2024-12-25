@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 )
 
 type httpClient interface {
@@ -65,6 +66,11 @@ func (l *Writer) Write(b []byte) (int, error) {
 		defer func() {
 			_ = res.Body.Close()
 		}()
+	}
+
+	if res.StatusCode == http.StatusUnauthorized || res.StatusCode == http.StatusForbidden {
+		return 0, fmt.Errorf("%s: username=%q, password=%q",
+			res.Status, l.user, strings.Repeat("x", len(l.passwd)))
 	}
 
 	if res.StatusCode != http.StatusCreated {
