@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -39,17 +40,15 @@ type Runner[RT Runnable, CT any] struct {
 	appName    string
 	appVer     string
 	cfg        CT
-	appFactory appFactory[RT, CT]
+	logWriters []io.Writer
 	srvMux     *http.ServeMux
 	srv        *http.Server
-	logLevel   zerolog.Level
-	logWriters []io.Writer
-	bsLog      zerolog.Logger // bootstrap logger, used until Run called
+	appFactory appFactory[RT, CT]
+	stopper    func(context.CancelFunc)
 }
 
 func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 	time.Local = time.UTC
-	logLevel := zerolog.InfoLevel
 
 	if appName == "" {
 		appName = os.Getenv("APP_NAME")
@@ -59,29 +58,12 @@ func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 		appVer = os.Getenv("APP_VERSION")
 	}
 
-	dbg := os.Getenv("APP_DEBUG")
-	if dbg == "true" || dbg == "1" {
-		logLevel = zerolog.DebugLevel
-	}
-
-	var logWriters []io.Writer
-	if isTerminal() {
-		logWriters = append(logWriters, zerolog.ConsoleWriter{Out: os.Stderr})
-	} else {
-		logWriters = append(logWriters, os.Stderr)
-	}
-
-	bsLog := zerolog.New(zerolog.MultiLevelWriter(logWriters...)).Level(logLevel).
-		With().Str("app", appName).Str("app_v", appVer).Logger()
-
 	return &Runner[RT, CT]{
 		appName:    appName,
 		appVer:     appVer,
 		cfg:        cfg,
 		appFactory: f,
-		logLevel:   logLevel,
-		logWriters: logWriters,
-		bsLog:      bsLog,
+		logWriters: []io.Writer{},
 	}
 }
 
@@ -90,14 +72,31 @@ func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
 	return r
 }
 
+func (r *Runner[RT, CT]) WithConsoleLogWriter() *Runner[RT, CT] {
+	var w io.Writer
+
+	if isTerminal() {
+		w = zerolog.ConsoleWriter{Out: os.Stderr}
+	} else {
+		w = os.Stderr
+	}
+
+	return r.WithLogWriter(w)
+}
+
+func (r *Runner[RT, CT]) WithStopper(f func(context.CancelFunc)) *Runner[RT, CT] {
+	r.stopper = f
+	return r
+}
+
 func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter(must bool) *Runner[RT, CT] {
 	w, err := httplogwriter.NewFromEnv()
 	if err != nil {
+		fmt.Printf("ERROR: setting up http log writer: %s\n", err)
 		if must {
-			r.bsLog.Error().Err(err).Msg("error setting up http log writer")
+
 			os.Exit(1)
 		}
-		r.bsLog.Warn().Err(err).Msg("http log writer has not been set up")
 		return r
 	}
 
@@ -106,7 +105,7 @@ func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter(must bool) *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 	if r.srv != nil {
-		r.bsLog.Error().Msg("http server is already set")
+		fmt.Println("http server is already set")
 		os.Exit(1)
 	}
 
@@ -142,7 +141,12 @@ func (r *Runner[RT, CT]) WithMetricsHandler() *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) Run() {
-	l := zerolog.New(zerolog.MultiLevelWriter(r.logWriters...)).Level(r.logLevel).
+	logLevel := zerolog.InfoLevel
+	if dbg := os.Getenv("APP_DEBUG"); dbg == "true" || dbg == "1" {
+		logLevel = zerolog.DebugLevel
+	}
+
+	l := zerolog.New(zerolog.MultiLevelWriter(r.logWriters...)).Level(logLevel).
 		With().Str("app", appName).Str("app_v", appVer).Logger()
 
 	for _, base := range []string{"config", appName} {
@@ -190,6 +194,10 @@ func (r *Runner[RT, CT]) Run() {
 
 	ctx, ctxC := context.WithCancel(context.Background())
 	defer ctxC()
+
+	if r.stopper != nil {
+		r.stopper(ctxC)
+	}
 
 	go func() {
 		s := <-sig
