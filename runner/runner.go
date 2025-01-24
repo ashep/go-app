@@ -68,6 +68,10 @@ func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 	}
 }
 
+func (r *Runner[RT, CT]) AppConfig() CT {
+	return r.appCfg
+}
+
 func (r *Runner[RT, CT]) WithExtConfig() *Runner[RT, CT] {
 	r.loadExtCfg = true
 	return r
