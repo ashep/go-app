@@ -13,9 +13,10 @@ import (
 
 	"github.com/ashep/go-app/httplogwriter"
 	"github.com/ashep/go-app/metrics"
-	"github.com/ashep/go-cfgloader"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
+
+	"github.com/ashep/go-app/cfgloader"
 )
 
 var (
@@ -40,7 +41,6 @@ type Runner[RT Runnable, CT any] struct {
 	appName    string
 	appVer     string
 	appCfg     CT
-	loadExtCfg bool
 	logWriters []io.Writer
 	srvMux     *http.ServeMux
 	srv        *http.Server
@@ -70,11 +70,6 @@ func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) AppConfig() CT {
 	return r.appCfg
-}
-
-func (r *Runner[RT, CT]) WithExtConfig() *Runner[RT, CT] {
-	r.loadExtCfg = true
-	return r
 }
 
 func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
@@ -159,33 +154,33 @@ func (r *Runner[RT, CT]) Run() {
 	l := zerolog.New(zerolog.MultiLevelWriter(r.logWriters...)).Level(logLevel).
 		With().Str("app", r.appName).Str("app_v", r.appVer).Logger()
 
-	if r.loadExtCfg {
-		for _, base := range []string{"config", r.appName} {
-			for _, ext := range []string{".yaml", ".json"} {
-				cfgPath := base + ext
-				err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil)
-				if err != nil && !errors.Is(err, os.ErrNotExist) {
-					l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
-					os.Exit(1)
-				} else if err == nil {
-					l.Debug().Str("path", cfgPath).Msg("config file loaded")
-				}
-			}
-		}
-
-		if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
-			if err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil); err != nil {
+	// Load config from pre-defined files
+	for _, base := range []string{"config", r.appName} {
+		for _, ext := range []string{".yaml", ".json"} {
+			cfgPath := base + ext
+			err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil)
+			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 				os.Exit(1)
+			} else if err == nil {
+				l.Debug().Str("path", cfgPath).Msg("config file loaded")
 			}
-
-			l.Debug().Str("path", cfgPath).Msg("config file loaded")
 		}
+	}
 
-		if err := cfgloader.LoadFromEnv("APP", &r.appCfg); err != nil {
-			l.Error().Err(err).Msg("load config from env vars failed")
+	// Load config from additional file
+	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
+		if err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil); err != nil {
+			l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 			os.Exit(1)
 		}
+		l.Debug().Str("path", cfgPath).Msg("config file loaded")
+	}
+
+	// Load config from env
+	if err := cfgloader.LoadFromEnv("APP", &r.appCfg); err != nil {
+		l.Error().Err(err).Msg("load config from env vars failed")
+		os.Exit(1)
 	}
 
 	sig := make(chan os.Signal, 1)
