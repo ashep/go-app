@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -66,10 +67,6 @@ func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 		appFactory: f,
 		logWriters: []io.Writer{},
 	}
-}
-
-func (r *Runner[RT, CT]) AppConfig() CT {
-	return r.appCfg
 }
 
 func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
@@ -147,7 +144,7 @@ func (r *Runner[RT, CT]) WithMetricsHandler() *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) Run() {
 	logLevel := zerolog.InfoLevel
-	if dbg := os.Getenv("APP_DEBUG"); dbg == "true" || dbg == "1" {
+	if dbg := strings.ToLower(os.Getenv("APP_DEBUG")); dbg == "true" || dbg == "1" {
 		logLevel = zerolog.DebugLevel
 	}
 
