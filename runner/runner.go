@@ -46,7 +46,6 @@ type Runner[RT Runnable, CT any] struct {
 	srvMux     *http.ServeMux
 	srv        *http.Server
 	appFactory appFactory[RT, CT]
-	stopper    func(context.CancelFunc)
 }
 
 func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
@@ -86,11 +85,6 @@ func (r *Runner[RT, CT]) WithConsoleLogWriter() *Runner[RT, CT] {
 	return r.WithLogWriter(w)
 }
 
-func (r *Runner[RT, CT]) WithStopper(f func(context.CancelFunc)) *Runner[RT, CT] {
-	r.stopper = f
-	return r
-}
-
 func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 	w, err := httplogwriter.NewFromEnv()
 	if err != nil {
@@ -125,7 +119,7 @@ func (r *Runner[RT, CT]) WithDefaultHTPServer() *Runner[RT, CT] {
 	})
 }
 
-func (r *Runner[RT, CT]) WithMetricsHandler() *Runner[RT, CT] {
+func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
 	if r.srv == nil {
 		panic("http server is not set")
 	}
@@ -194,10 +188,6 @@ func (r *Runner[RT, CT]) Run() {
 
 	ctx, ctxC := context.WithCancel(context.Background())
 	defer ctxC()
-
-	if r.stopper != nil {
-		r.stopper(ctxC)
-	}
 
 	go func() {
 		s := <-sig
