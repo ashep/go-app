@@ -91,14 +91,10 @@ func (r *Runner[RT, CT]) WithStopper(f func(context.CancelFunc)) *Runner[RT, CT]
 	return r
 }
 
-func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter(must bool) *Runner[RT, CT] {
+func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 	w, err := httplogwriter.NewFromEnv()
 	if err != nil {
 		fmt.Printf("ERROR: setting up http log writer: %s\n", err)
-		if must {
-
-			os.Exit(1)
-		}
 		return r
 	}
 
@@ -119,7 +115,7 @@ func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTPServer() *Runner[RT, CT] {
-	addr := os.Getenv("APP_HTTP_SERVER_ADDR")
+	addr := os.Getenv("APP_HTTPSERVER_ADDR")
 	if addr == "" {
 		addr = ":9000"
 	}
