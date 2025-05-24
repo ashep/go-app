@@ -53,7 +53,7 @@ func writeTempFile(t *testing.T, b []byte, ext string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // ok
 
 	if _, err = f.Write(b); err != nil {
 		return "", err

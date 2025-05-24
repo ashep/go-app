@@ -35,7 +35,7 @@ func LoadJSONFromPath(path string, out interface{}, schema []byte) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck // ok
 
 	b, err := io.ReadAll(f)
 	if err != nil {
