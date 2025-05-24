@@ -108,7 +108,7 @@ func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 	return r
 }
 
-func (r *Runner[RT, CT]) WithDefaultHTPServer() *Runner[RT, CT] {
+func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
 	addr := os.Getenv("APP_HTTPSERVER_ADDR")
 	if addr == "" {
 		addr = ":9000"
