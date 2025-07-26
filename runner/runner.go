@@ -173,6 +173,10 @@ func (r *Runner[RT, CT]) Run() {
 		l.Error().Err(err).Msg("load config from env vars failed")
 		os.Exit(1)
 	}
+	if err := cfgloader.LoadFromEnv(strings.ToUpper(appName), &r.appCfg); err != nil {
+		l.Error().Err(err).Msg("load config from env vars failed")
+		os.Exit(1)
+	}
 
 	if err := r.appCfg.Validate(); err != nil {
 		l.Error().Err(err).Msg("config validation failed")
