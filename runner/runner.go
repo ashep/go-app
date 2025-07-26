@@ -36,9 +36,13 @@ type Runnable interface {
 	Run(context.Context) error
 }
 
-type appFactory[RT Runnable, CT any] func(cfg CT, rt *Runtime) (RT, error)
+type Validatable interface {
+	Validate() error
+}
 
-type Runner[RT Runnable, CT any] struct {
+type appFactory[RT Runnable, CT Validatable] func(cfg CT, rt *Runtime) (RT, error)
+
+type Runner[RT Runnable, CT Validatable] struct {
 	appName    string
 	appVer     string
 	appCfg     CT
@@ -48,7 +52,7 @@ type Runner[RT Runnable, CT any] struct {
 	appFactory appFactory[RT, CT]
 }
 
-func New[RT Runnable, CT any](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
+func New[RT Runnable, CT Validatable](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
 	time.Local = time.UTC
 
 	if appName == "" {
@@ -170,6 +174,11 @@ func (r *Runner[RT, CT]) Run() {
 		os.Exit(1)
 	}
 
+	if err := r.appCfg.Validate(); err != nil {
+		l.Error().Err(err).Msg("config validation failed")
+		os.Exit(1)
+	}
+
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
@@ -201,7 +210,8 @@ func (r *Runner[RT, CT]) Run() {
 			if err := r.srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
 				l.Info().Msg("http server closed")
 			} else if err != nil {
-				l.Error().Err(err).Msg("http server serve failed")
+				l.Error().Err(err).Msg("http server listen and serve failed")
+				ctxC()
 			}
 		}()
 	}
