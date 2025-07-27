@@ -40,19 +40,19 @@ type Validatable interface {
 	Validate() error
 }
 
-type appFactory[RT Runnable, CT Validatable] func(cfg CT, rt *Runtime) (RT, error)
+type appFactory[RT Runnable, CT any] func(cfg *CT, rt *Runtime) (RT, error)
 
-type Runner[RT Runnable, CT Validatable] struct {
+type Runner[RT Runnable, CT any] struct {
 	appName    string
 	appVer     string
-	appCfg     CT
+	appCfg     *CT
 	logWriters []io.Writer
 	srvMux     *http.ServeMux
 	srv        *http.Server
 	appFactory appFactory[RT, CT]
 }
 
-func New[RT Runnable, CT Validatable](f appFactory[RT, CT]) *Runner[RT, CT] {
+func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 	time.Local = time.UTC
 
 	if appName == "" {
@@ -66,7 +66,7 @@ func New[RT Runnable, CT Validatable](f appFactory[RT, CT]) *Runner[RT, CT] {
 	return &Runner[RT, CT]{
 		appName:    appName,
 		appVer:     appVer,
-		appCfg:     *(new(CT)),
+		appCfg:     new(CT),
 		appFactory: f,
 		logWriters: []io.Writer{},
 	}
@@ -178,9 +178,11 @@ func (r *Runner[RT, CT]) Run() {
 		os.Exit(1)
 	}
 
-	if err := r.appCfg.Validate(); err != nil {
-		l.Error().Err(err).Msg("config validation failed")
-		os.Exit(1)
+	if appCfgT, ok := any(r.appCfg).(Validatable); ok {
+		if err := appCfgT.Validate(); err != nil {
+			l.Error().Err(err).Msg("config validation failed")
+			os.Exit(1)
+		}
 	}
 
 	sig := make(chan os.Signal, 1)
