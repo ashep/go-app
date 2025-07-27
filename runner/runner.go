@@ -52,7 +52,7 @@ type Runner[RT Runnable, CT Validatable] struct {
 	appFactory appFactory[RT, CT]
 }
 
-func New[RT Runnable, CT Validatable](f appFactory[RT, CT], cfg CT) *Runner[RT, CT] {
+func New[RT Runnable, CT Validatable](f appFactory[RT, CT]) *Runner[RT, CT] {
 	time.Local = time.UTC
 
 	if appName == "" {
@@ -66,7 +66,7 @@ func New[RT Runnable, CT Validatable](f appFactory[RT, CT], cfg CT) *Runner[RT, 
 	return &Runner[RT, CT]{
 		appName:    appName,
 		appVer:     appVer,
-		appCfg:     cfg,
+		appCfg:     *(new(CT)),
 		appFactory: f,
 		logWriters: []io.Writer{},
 	}
