@@ -147,9 +147,9 @@ func (r *Runner[RT, CT]) Run() {
 
 	// Load config from pre-defined files
 	for _, base := range []string{"config", r.appName} {
-		for _, ext := range []string{".yaml", ".json"} {
+		for _, ext := range []string{".yaml", ".yml", ".json"} {
 			cfgPath := base + ext
-			err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil)
+			err := cfgloader.LoadFromPath(cfgPath, r.appCfg, nil)
 			if err != nil && !errors.Is(err, os.ErrNotExist) {
 				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 				os.Exit(1)
@@ -161,7 +161,7 @@ func (r *Runner[RT, CT]) Run() {
 
 	// Load config from additional file
 	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
-		if err := cfgloader.LoadFromPath(cfgPath, &r.appCfg, nil); err != nil {
+		if err := cfgloader.LoadFromPath(cfgPath, r.appCfg, nil); err != nil {
 			l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
 			os.Exit(1)
 		}
@@ -169,11 +169,11 @@ func (r *Runner[RT, CT]) Run() {
 	}
 
 	// Load config from env
-	if err := cfgloader.LoadFromEnv("APP", &r.appCfg); err != nil {
+	if err := cfgloader.LoadFromEnv("APP", r.appCfg); err != nil {
 		l.Error().Err(err).Msg("load config from env vars failed")
 		os.Exit(1)
 	}
-	if err := cfgloader.LoadFromEnv(strings.ToUpper(appName), &r.appCfg); err != nil {
+	if err := cfgloader.LoadFromEnv(strings.ToUpper(appName), r.appCfg); err != nil {
 		l.Error().Err(err).Msg("load config from env vars failed")
 		os.Exit(1)
 	}
