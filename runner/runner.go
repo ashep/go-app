@@ -119,7 +119,7 @@ func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
-	addr := os.Getenv("APP_HTTPSERVER_ADDR")
+	addr := os.Getenv(strings.ToUpper(appName) + "_HTTPSERVER_ADDR")
 	if addr == "" {
 		addr = ":9000"
 	}
@@ -136,8 +136,20 @@ func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
 
 	metrics.SetAppName(r.appName)
 	metrics.SetAppVersion(r.appVer)
-
 	r.srvMux.Handle("/metrics", promhttp.Handler())
+
+	return r
+}
+
+func (r *Runner[RT, CT]) WithDefaultHealthHandler() *Runner[RT, CT] {
+	if r.srv == nil {
+		panic("http server is not set")
+	}
+
+	r.srvMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("OK"))
+	})
 
 	return r
 }
