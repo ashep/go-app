@@ -58,9 +58,15 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 	if appName == "" {
 		appName = os.Getenv("APP_NAME")
 	}
+	if appName == "" {
+		appName = "app"
+	}
 
 	if appVer == "" {
 		appVer = os.Getenv("APP_VERSION")
+	}
+	if appVer == "" {
+		appVer = "0.0.1"
 	}
 
 	return &Runner[RT, CT]{
@@ -90,7 +96,7 @@ func (r *Runner[RT, CT]) WithConsoleLogWriter() *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
-	w, err := httplogwriter.NewFromEnv()
+	w, err := httplogwriter.NewFromEnv(appName)
 	if err != nil {
 		fmt.Printf("ERROR: setting up http log writer: %s\n", err)
 		return r

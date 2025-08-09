@@ -37,11 +37,12 @@ func New(u, user, passwd string) (*Writer, error) {
 	}, nil
 }
 
-func NewFromEnv() (*Writer, error) {
+func NewFromEnv(prefix string) (*Writer, error) {
+	prefix = strings.ToUpper(prefix)
 	return New(
-		os.Getenv("APP_LOGSERVER_URL"),
-		os.Getenv("APP_LOGSERVER_USERNAME"),
-		os.Getenv("APP_LOGSERVER_PASSWORD"),
+		os.Getenv(prefix+"_LOGSERVER_URL"),
+		os.Getenv(prefix+"_LOGSERVER_USERNAME"),
+		os.Getenv(prefix+"_LOGSERVER_PASSWORD"),
 	)
 }
 
