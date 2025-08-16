@@ -96,7 +96,7 @@ func (r *Runner[RT, CT]) WithConsoleLogWriter() *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
-	w, err := httplogwriter.NewFromEnv(appName)
+	w, err := httplogwriter.NewFromEnv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")))
 	if err != nil {
 		fmt.Printf("ERROR: setting up http log writer: %s\n", err)
 		return r
@@ -119,7 +119,7 @@ func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
-	addr := os.Getenv(strings.ToUpper(appName) + "_HTTPSERVER_ADDR")
+	addr := os.Getenv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")) + "_HTTPSERVER_ADDR")
 	if addr == "" {
 		addr = ":9000"
 	}
