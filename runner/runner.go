@@ -88,6 +88,11 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 	}
 }
 
+func (r *Runner[RT, CT]) WithConfig(cfg *CT) *Runner[RT, CT] {
+	r.appCfg = cfg
+	return r
+}
+
 func (r *Runner[RT, CT]) WithLogWriter(w io.Writer) *Runner[RT, CT] {
 	r.logWriters = append(r.logWriters, w)
 	return r
