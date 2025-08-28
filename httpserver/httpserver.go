@@ -2,6 +2,7 @@ package httpserver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -41,6 +42,7 @@ type Server struct {
 func New(opts ...Option) *Server {
 	s := &Server{
 		srv: &http.Server{},
+		mux: http.NewServeMux(),
 	}
 
 	for _, opt := range opts {
@@ -64,7 +66,7 @@ func (s *Server) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 
 func (s *Server) Run() error {
 	if s.lis == nil {
-		WithAddr("127.0.0.1:9000")(s)
+		return errors.New("no address specified")
 	}
 
 	return s.srv.Serve(s.lis)
