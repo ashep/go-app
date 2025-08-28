@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -13,6 +14,7 @@ import (
 	"time"
 
 	"github.com/ashep/go-app/httplogwriter"
+	"github.com/ashep/go-app/httpserver"
 	"github.com/ashep/go-app/metrics"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
@@ -28,7 +30,7 @@ var (
 type Runtime struct {
 	AppName    string
 	AppVersion string
-	SrvMux     *http.ServeMux
+	Server     httpServer
 	Logger     zerolog.Logger
 }
 
@@ -40,6 +42,15 @@ type Validatable interface {
 	Validate() error
 }
 
+type httpServer interface {
+	Listener() net.Listener
+	Handle(pattern string, handler http.Handler)
+	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+	Run() error
+	Start(ctx context.Context) chan error
+	Stop(ctx context.Context) error
+}
+
 type appFactory[RT Runnable, CT any] func(cfg *CT, rt *Runtime) (RT, error)
 
 type Runner[RT Runnable, CT any] struct {
@@ -47,8 +58,7 @@ type Runner[RT Runnable, CT any] struct {
 	appVer     string
 	appCfg     *CT
 	logWriters []io.Writer
-	srvMux     *http.ServeMux
-	srv        *http.Server
+	srv        httpServer
 	appFactory appFactory[RT, CT]
 }
 
@@ -105,16 +115,12 @@ func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 	return r.WithLogWriter(w)
 }
 
-func (r *Runner[RT, CT]) WithHTTPServer(s *http.Server) *Runner[RT, CT] {
+func (r *Runner[RT, CT]) WithHTTPServer(s httpServer) *Runner[RT, CT] {
 	if r.srv != nil {
 		fmt.Println("http server is already set")
 		os.Exit(1)
 	}
-
-	r.srvMux = http.NewServeMux()
-	s.Handler = r.srvMux
 	r.srv = s
-
 	return r
 }
 
@@ -123,10 +129,7 @@ func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
 	if addr == "" {
 		addr = ":9000"
 	}
-
-	return r.WithHTTPServer(&http.Server{
-		Addr: addr,
-	})
+	return r.WithHTTPServer(httpserver.New(httpserver.WithAddr(addr)))
 }
 
 func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
@@ -136,7 +139,7 @@ func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
 
 	metrics.SetAppName(r.appName)
 	metrics.SetAppVersion(r.appVer)
-	r.srvMux.Handle("/metrics", promhttp.Handler())
+	r.srv.Handle("/metrics", promhttp.Handler())
 
 	return r
 }
@@ -146,7 +149,7 @@ func (r *Runner[RT, CT]) WithDefaultHealthHandler() *Runner[RT, CT] {
 		panic("http server is not set")
 	}
 
-	r.srvMux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
+	r.srv.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte("OK"))
 	})
@@ -209,7 +212,7 @@ func (r *Runner[RT, CT]) Run() {
 	rt := &Runtime{
 		AppName:    r.appName,
 		AppVersion: r.appVer,
-		SrvMux:     r.srvMux,
+		Server:     r.srv,
 		Logger:     l,
 	}
 
@@ -228,28 +231,9 @@ func (r *Runner[RT, CT]) Run() {
 		ctxC()
 	}()
 
-	if r.srv != nil {
-		go func() {
-			l.Info().Str("addr", r.srv.Addr).Msg("http server is starting")
-			if err := r.srv.ListenAndServe(); errors.Is(err, http.ErrServerClosed) {
-				l.Info().Msg("http server closed")
-			} else if err != nil {
-				l.Error().Err(err).Msg("http server listen and serve failed")
-				ctxC()
-			}
-		}()
-	}
-
 	if err := app.Run(ctx); err != nil {
 		l.Error().Err(err).Msg("app run failed")
 		os.Exit(1)
-	}
-
-	if r.srv != nil {
-		l.Info().Msg("http server is shutting down")
-		if err := r.srv.Shutdown(context.Background()); err != nil {
-			l.Error().Err(err).Msg("http server shutdown failed")
-		}
 	}
 }
 
