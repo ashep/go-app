@@ -40,9 +40,13 @@ type Server struct {
 }
 
 func New(opts ...Option) *Server {
+	mux := http.NewServeMux()
+
 	s := &Server{
-		srv: &http.Server{},
-		mux: http.NewServeMux(),
+		srv: &http.Server{
+			Handler: mux,
+		},
+		mux: mux,
 	}
 
 	for _, opt := range opts {
