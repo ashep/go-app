@@ -122,8 +122,7 @@ func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 		if os.Getenv(prefix+"_LOGSERVER_URL") == "" {
 			continue
 		}
-		w, err = httplogwriter.NewFromEnv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")))
-		if err != nil {
+		if w, err = httplogwriter.NewFromEnv(prefix); err != nil {
 			fmt.Printf("ERROR: setting up http log writer: %s\n", err)
 			return r
 		}
