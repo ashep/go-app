@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -70,8 +71,18 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 		appName = os.Getenv("APP_NAME")
 	}
 	if appName == "" {
-		appName = "app"
+		wd, err := os.Getwd()
+		if err != nil {
+			fmt.Println("Unable to determine current working directory")
+			os.Exit(1)
+		}
+		appName = filepath.Dir(wd)
 	}
+
+	appName2 := strings.ReplaceAll(appName, "-", "_")
+	appName2 = strings.ReplaceAll(appName2, ".", "_")
+	appName2 = strings.ReplaceAll(appName2, " ", "_")
+	appName2 = strings.ToUpper(appName2)
 
 	if appVer == "" {
 		appVer = os.Getenv("APP_VERSION")
@@ -82,7 +93,7 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 
 	return &Runner[RT, CT]{
 		appName:    appName,
-		appName2:   strings.ToUpper(strings.ReplaceAll(appName, "-", "_")),
+		appName2:   appName2,
 		appVer:     appVer,
 		appCfg:     new(CT),
 		appFactory: f,
@@ -265,7 +276,8 @@ func (r *Runner[RT, CT]) RunContext(ctx context.Context) {
 		os.Exit(1)
 	}
 
-	if err := app.Run(ctx); err != nil {
+	err = app.Run(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, http.ErrServerClosed) {
 		l.Error().Err(err).Msg("app run failed")
 		os.Exit(1)
 	}
