@@ -38,7 +38,6 @@ func New(u, user, passwd string) (*Writer, error) {
 }
 
 func NewFromEnv(prefix string) (*Writer, error) {
-	prefix = strings.ToUpper(prefix)
 	return New(
 		os.Getenv(prefix+"_LOGSERVER_URL"),
 		os.Getenv(prefix+"_LOGSERVER_USERNAME"),

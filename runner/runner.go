@@ -55,6 +55,7 @@ type appFactory[RT Runnable, CT any] func(cfg *CT, rt *Runtime) (RT, error)
 
 type Runner[RT Runnable, CT any] struct {
 	appName    string
+	appName2   string
 	appVer     string
 	appCfg     *CT
 	logWriters []io.Writer
@@ -81,6 +82,7 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 
 	return &Runner[RT, CT]{
 		appName:    appName,
+		appName2:   strings.ToUpper(strings.ReplaceAll(appName, "-", "_")),
 		appVer:     appVer,
 		appCfg:     new(CT),
 		appFactory: f,
@@ -111,10 +113,25 @@ func (r *Runner[RT, CT]) WithConsoleLogWriter() *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
-	w, err := httplogwriter.NewFromEnv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")))
-	if err != nil {
-		fmt.Printf("ERROR: setting up http log writer: %s\n", err)
-		return r
+	var (
+		w   *httplogwriter.Writer
+		err error
+	)
+
+	for _, prefix := range []string{"APP", r.appName2} {
+		if os.Getenv(prefix+"_LOGSERVER_URL") == "" {
+			continue
+		}
+		w, err = httplogwriter.NewFromEnv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")))
+		if err != nil {
+			fmt.Printf("ERROR: setting up http log writer: %s\n", err)
+			return r
+		}
+	}
+
+	if w == nil {
+		fmt.Printf("Neither APP_LOGSERVER_URL nor %s_LOGSERVER_URL env var defined\n")
+		os.Exit(1)
 	}
 
 	return r.WithLogWriter(w)
@@ -130,7 +147,12 @@ func (r *Runner[RT, CT]) WithHTTPServer(s httpServer) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
-	addr := os.Getenv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")) + "_HTTPSERVER_ADDR")
+	addr := ""
+	for _, prefix := range []string{"APP", r.appName2} {
+		if addr = os.Getenv(prefix + "_HTTPSERVER_ADDR"); addr != "" {
+			break
+		}
+	}
 	if addr == "" {
 		addr = ":9000"
 	}
@@ -139,7 +161,8 @@ func (r *Runner[RT, CT]) WithDefaultHTTPServer() *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
 	if r.srv == nil {
-		panic("http server is not set")
+		fmt.Println("http server is not set")
+		os.Exit(1)
 	}
 
 	metrics.SetAppName(r.appName)
@@ -151,7 +174,8 @@ func (r *Runner[RT, CT]) WithDefaultMetricsHandler() *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) WithDefaultHealthHandler() *Runner[RT, CT] {
 	if r.srv == nil {
-		panic("http server is not set")
+		fmt.Println("http server is not set")
+		os.Exit(1)
 	}
 
 	r.srv.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
@@ -163,8 +187,26 @@ func (r *Runner[RT, CT]) WithDefaultHealthHandler() *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) Run() {
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+
+	ctx, ctxC := context.WithCancel(context.Background())
+	defer ctxC()
+
+	go func() {
+		<-sig
+		ctxC()
+	}()
+
+	r.RunContext(ctx)
+}
+
+func (r *Runner[RT, CT]) RunContext(ctx context.Context) {
 	logLevel := zerolog.InfoLevel
 	if dbg := strings.ToLower(os.Getenv("APP_DEBUG")); dbg == "true" || dbg == "1" {
+		logLevel = zerolog.DebugLevel
+	}
+	if dbg := strings.ToLower(os.Getenv(r.appName2 + "_DEBUG")); dbg == "true" || dbg == "1" {
 		logLevel = zerolog.DebugLevel
 	}
 
@@ -186,22 +228,22 @@ func (r *Runner[RT, CT]) Run() {
 	}
 
 	// Load config from additional file
-	if cfgPath := os.Getenv("APP_CONFIG_PATH"); cfgPath != "" {
-		if err := cfgloader.LoadFromPath(cfgPath, r.appCfg, nil); err != nil {
-			l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
-			os.Exit(1)
+	for _, prefix := range []string{"APP", r.appName2} {
+		if cfgPath := os.Getenv(prefix + "_CONFIG_PATH"); cfgPath != "" {
+			if err := cfgloader.LoadFromPath(cfgPath, r.appCfg, nil); err != nil {
+				l.Error().Err(err).Str("path", cfgPath).Msg("config file load failed")
+				os.Exit(1)
+			}
+			l.Debug().Str("path", cfgPath).Msg("config file loaded")
 		}
-		l.Debug().Str("path", cfgPath).Msg("config file loaded")
 	}
 
 	// Load config from env
-	if err := cfgloader.LoadFromEnv("APP", r.appCfg); err != nil {
-		l.Error().Err(err).Msg("load config from env vars failed")
-		os.Exit(1)
-	}
-	if err := cfgloader.LoadFromEnv(strings.ToUpper(strings.ReplaceAll(appName, "-", "_")), r.appCfg); err != nil {
-		l.Error().Err(err).Msg("load config from env vars failed")
-		os.Exit(1)
+	for _, prefix := range []string{"APP", r.appName2} {
+		if err := cfgloader.LoadFromEnv(prefix, r.appCfg); err != nil {
+			l.Error().Err(err).Msgf("load config from %s_ env vars failed", prefix)
+			os.Exit(1)
+		}
 	}
 
 	if appCfgT, ok := any(r.appCfg).(Validatable); ok {
@@ -210,9 +252,6 @@ func (r *Runner[RT, CT]) Run() {
 			os.Exit(1)
 		}
 	}
-
-	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
 
 	rt := &Runtime{
 		AppName:    r.appName,
@@ -226,15 +265,6 @@ func (r *Runner[RT, CT]) Run() {
 		l.Error().Err(err).Msg("app init failed")
 		os.Exit(1)
 	}
-
-	ctx, ctxC := context.WithCancel(context.Background())
-	defer ctxC()
-
-	go func() {
-		s := <-sig
-		l.Info().Str("signal", s.String()).Msg("signal received")
-		ctxC()
-	}()
 
 	if err := app.Run(ctx); err != nil {
 		l.Error().Err(err).Msg("app run failed")
