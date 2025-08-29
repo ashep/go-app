@@ -130,7 +130,7 @@ func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 	}
 
 	if w == nil {
-		fmt.Printf("Neither APP_LOGSERVER_URL nor %s_LOGSERVER_URL env var defined\n")
+		fmt.Printf("Neither APP_LOGSERVER_URL nor %s_LOGSERVER_URL env var defined\n", r.appName2)
 		os.Exit(1)
 	}
 
