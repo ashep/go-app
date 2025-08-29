@@ -76,7 +76,7 @@ func New[RT Runnable, CT any](f appFactory[RT, CT]) *Runner[RT, CT] {
 			fmt.Println("Unable to determine current working directory")
 			os.Exit(1)
 		}
-		appName = filepath.Dir(wd)
+		appName = filepath.Base(wd)
 	}
 
 	appName2 := strings.ReplaceAll(appName, "-", "_")
