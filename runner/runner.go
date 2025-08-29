@@ -135,13 +135,15 @@ func (r *Runner[RT, CT]) WithDefaultHTTPLogWriter() *Runner[RT, CT] {
 		}
 		if w, err = httplogwriter.NewFromEnv(prefix); err != nil {
 			fmt.Printf("ERROR: setting up http log writer: %s\n", err)
+			fmt.Println("WARN: HTTP logging is disabled")
 			return r
 		}
 	}
 
 	if w == nil {
-		fmt.Printf("Neither APP_LOGSERVER_URL nor %s_LOGSERVER_URL env var defined\n", r.appName2)
-		os.Exit(1)
+		fmt.Printf("ERROR: neither APP_LOGSERVER_URL nor %s_LOGSERVER_URL env var defined\n", r.appName2)
+		fmt.Println("WARN: HTTP logging is disabled")
+		return r
 	}
 
 	return r.WithLogWriter(w)
