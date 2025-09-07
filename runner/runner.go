@@ -28,9 +28,10 @@ var (
 	appVer  = "" //nolint:gochecknoglobals // set externally
 )
 
-type Runtime struct {
+type Runtime[CT any] struct {
 	AppName    string
 	AppVersion string
+	Config     *CT
 	Server     httpServer
 	Logger     zerolog.Logger
 }
@@ -52,7 +53,7 @@ type httpServer interface {
 	Stop(ctx context.Context) error
 }
 
-type appFactory[RT Runnable, CT any] func(cfg *CT, rt *Runtime) (RT, error)
+type appFactory[RT Runnable, CT any] func(rt *Runtime[CT]) (RT, error)
 
 type Runner[RT Runnable, CT any] struct {
 	appName    string
@@ -265,14 +266,15 @@ func (r *Runner[RT, CT]) RunContext(ctx context.Context) {
 		}
 	}
 
-	rt := &Runtime{
+	rt := &Runtime[CT]{
 		AppName:    r.appName,
 		AppVersion: r.appVer,
+		Config:     r.appCfg,
 		Server:     r.srv,
 		Logger:     l,
 	}
 
-	app, err := r.appFactory(r.appCfg, rt)
+	app, err := r.appFactory(rt)
 	if err != nil {
 		l.Error().Err(err).Msg("app init failed")
 		os.Exit(1)
