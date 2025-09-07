@@ -86,10 +86,12 @@ func (tr *TestRunner[RT, CT]) Start() {
 
 	tr.t.Cleanup(func() {
 		cancel()
-		require.Eventually(tr.t, func() bool {
-			_, err := http.Get(tr.ServerURL("/"))
-			return err != nil
-		}, time.Second, 100*time.Millisecond, "server had not stopped within 1 second")
+		if tr.runtime.Server != nil {
+			require.Eventually(tr.t, func() bool {
+				_, err := http.Get(tr.ServerURL("/"))
+				return err != nil
+			}, time.Second, 100*time.Millisecond, "server had not stopped within 1 second")
+		}
 	})
 }
 
