@@ -26,6 +26,10 @@ func New[RT runner.Runnable, CT any](
 	f appFactory[RT, CT],
 	cfg *CT,
 ) *TestRunner[RT, CT] {
+	if appCfgT, ok := any(cfg).(runner.Validatable); ok {
+		require.NoError(t, appCfgT.Validate(), "config validation failed")
+	}
+
 	l, lb := testlogger.New()
 
 	rt := &runner.Runtime[CT]{
