@@ -1,6 +1,7 @@
 package testrunner_test
 
 import (
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -11,25 +12,25 @@ import (
 
 func TestRunner(main *testing.T) {
 	main.Run("Run", func(t *testing.T) {
-		cnt := 0
-		testrunner.New(t, runMock, cfgMock{t: t, foo: "bar", cnt: &cnt}).Run()
-		assert.Equal(t, 1, cnt)
+		cnt := &atomic.Int64{}
+		testrunner.New(t, runMock, cfgMock{t: t, foo: "bar", cnt: cnt}).Run()
+		assert.Equal(t, int64(1), cnt.Load())
 	})
 
 	main.Run("Start", func(t *testing.T) {
-		cnt := 0
+		cnt := &atomic.Int64{}
 
 		testrunner.New(t, runMock, cfgMock{
 			t:    t,
 			foo:  "bar",
-			cnt:  &cnt,
+			cnt:  cnt,
 			wait: true,
 		}).
-			SetStartWaiter(func(cfg cfgMock) bool { *cfg.cnt++; return true }).
+			SetStartWaiter(func(cfg cfgMock) bool { cfg.cnt.Store(1); return true }).
 			Start()
 
 		assert.Eventually(t, func() bool {
-			return cnt == 2
+			return cnt.Load() == 1
 		}, time.Millisecond*100, time.Millisecond*10)
 	})
 }
@@ -37,13 +38,13 @@ func TestRunner(main *testing.T) {
 type cfgMock struct {
 	t    *testing.T
 	foo  string
-	cnt  *int
+	cnt  *atomic.Int64
 	wait bool
 }
 
 func runMock(rt *runner.Runtime[cfgMock]) error {
 	assert.Equal(rt.Cfg.t, rt.Cfg.foo, "bar")
-	*rt.Cfg.cnt++
+	rt.Cfg.cnt.Add(1)
 
 	if rt.Cfg.wait {
 		<-rt.Ctx.Done()
