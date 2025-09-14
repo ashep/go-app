@@ -32,6 +32,6 @@ func TestRegisterServer(main *testing.T) {
 		require.NoError(t, err)
 
 		host := strings.TrimPrefix(s.BaseURL(), "http://")
-		assert.Contains(t, string(b), `http_server_request_duration_seconds_count{app_v="1.2.3",code="200",host="`+host+`",method="GET",path="/foo"} 1`)
+		assert.Contains(t, string(b), `http_server_request_duration_seconds_count{app="an-app",app_v="1.2.3",code="200",host="`+host+`",method="GET",path="/foo"} 1`)
 	})
 }

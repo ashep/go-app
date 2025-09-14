@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/ashep/go-app/cfgloader"
 	"github.com/ashep/go-app/httplogwriter"
@@ -42,8 +41,6 @@ type Runner[RT func(*Runtime[CT]) error, CT any] struct {
 }
 
 func New[RT func(*Runtime[CT]) error, CT any](run RT) *Runner[RT, CT] {
-	time.Local = time.UTC
-
 	if appName == "" {
 		appName = os.Getenv("APP_NAME")
 	}
