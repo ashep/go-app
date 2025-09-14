@@ -2,6 +2,7 @@ package testrunner
 
 import (
 	"context"
+	"net"
 	"testing"
 	"time"
 
@@ -35,6 +36,14 @@ func New[RT func(*runner.Runtime[CT]) error, CT any](t *testing.T, run RT, cfg C
 
 func (r *Runner[RT, CT]) SetStartWaiter(w func(CT) bool) *Runner[RT, CT] {
 	r.waitStart = w
+	return r
+}
+
+func (r *Runner[RT, CT]) SetTCPPortStartWaiter(addr *net.TCPAddr) *Runner[RT, CT] {
+	r.SetStartWaiter(func(CT) bool {
+		_, err := net.DialTCP("tcp", nil, addr)
+		return err == nil
+	})
 	return r
 }
 
