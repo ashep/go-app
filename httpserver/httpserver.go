@@ -53,6 +53,10 @@ func New(opts ...Option) *Server {
 		opt(s)
 	}
 
+	if s.lis == nil {
+		WithAddr("127.0.0.1:9000")(s)
+	}
+
 	return s
 }
 
@@ -68,32 +72,25 @@ func (s *Server) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 	s.mux.HandleFunc(pattern, handler)
 }
 
-func (s *Server) Run() error {
-	if s.lis == nil {
-		return errors.New("no address specified")
-	}
-
-	return s.srv.Serve(s.lis)
-}
-
-func (s *Server) Start(ctx context.Context) chan error {
-	done := make(chan error)
+func (s *Server) Run(ctx context.Context) error {
+	serveErr := make(chan error)
 
 	go func() {
-		defer close(done)
-		done <- s.Run()
+		defer close(serveErr)
+		err := s.srv.Serve(s.lis)
+		if errors.Is(err, http.ErrServerClosed) {
+			serveErr <- nil
+		} else if err != nil {
+			serveErr <- err
+		}
 	}()
 
 	go func() {
 		<-ctx.Done()
 		sCtx, sCtxC := context.WithTimeout(context.Background(), time.Second*5)
 		defer sCtxC()
-		_ = s.Stop(sCtx)
+		_ = s.srv.Shutdown(sCtx)
 	}()
 
-	return done
-}
-
-func (s *Server) Stop(ctx context.Context) error {
-	return s.srv.Shutdown(ctx)
+	return <-serveErr
 }

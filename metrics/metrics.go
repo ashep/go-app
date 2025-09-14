@@ -10,7 +10,16 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+const (
+	URLPath = "/metrics"
+)
+
+type httpServer interface {
+	Handle(pattern string, handler http.Handler)
+}
 
 var (
 	appName    string
@@ -22,15 +31,13 @@ var (
 	histograms = make(map[string]*prometheus.HistogramVec)
 )
 
-func SetAppName(name string) {
-	appName = name
+func RegisterServer(appName, appVer string, srv httpServer) {
+	appName = appName
+	appVersion = appVer
+	srv.Handle(URLPath, promhttp.Handler())
 }
 
-func SetAppVersion(version string) {
-	appVersion = version
-}
-
-func HTTPServerRequest(req *http.Request, path string) func(int) {
+func MeasureHTTPServerRequest(req *http.Request, path string) func(int) {
 	lbs := prometheus.Labels{
 		"method": req.Method,
 		"host":   req.Host,
@@ -46,7 +53,7 @@ func HTTPServerRequest(req *http.Request, path string) func(int) {
 		lbs["app_v"] = appVersion
 	}
 
-	dur := Histogram("http_server_request_duration_seconds", "HTTP server request duration.", lbs)
+	dur := GetHistogram("http_server_request_duration_seconds", "HTTP server request duration.", lbs)
 
 	start := time.Now()
 	return func(statusCode int) {
@@ -55,7 +62,7 @@ func HTTPServerRequest(req *http.Request, path string) func(int) {
 	}
 }
 
-func HTTPClientRequest(req *http.Request, path string) func(int) {
+func MesureHTTPClientRequest(req *http.Request, path string) func(int) {
 	lbs := prometheus.Labels{
 		"method": req.Method,
 		"host":   req.Host,
@@ -71,7 +78,7 @@ func HTTPClientRequest(req *http.Request, path string) func(int) {
 		lbs["app_v"] = appVersion
 	}
 
-	dur := Histogram("http_client_request_duration_seconds", "HTTP server request duration.", lbs)
+	dur := GetHistogram("http_client_request_duration_seconds", "HTTP server request duration.", lbs)
 
 	start := time.Now()
 	return func(statusCode int) {
@@ -80,7 +87,7 @@ func HTTPClientRequest(req *http.Request, path string) func(int) {
 	}
 }
 
-func Counter(name, help string, labels prometheus.Labels) *prometheus.CounterVec {
+func GetCounter(name, help string, labels prometheus.Labels) *prometheus.CounterVec {
 	if appName != "" {
 		labels["app"] = appName
 	}
@@ -111,7 +118,7 @@ func Counter(name, help string, labels prometheus.Labels) *prometheus.CounterVec
 	return h
 }
 
-func Histogram(name, help string, labels prometheus.Labels) *prometheus.HistogramVec {
+func GetHistogram(name, help string, labels prometheus.Labels) *prometheus.HistogramVec {
 	k := metricKey(name, labels)
 
 	mux.RLock()

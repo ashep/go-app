@@ -1,7 +1,6 @@
 package testhttpserver_test
 
 import (
-	"context"
 	"io"
 	"net/http"
 	"testing"
@@ -13,20 +12,18 @@ import (
 
 func TestHTTPServer(main *testing.T) {
 	main.Run("Ok", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-
-		s := testhttpserver.New()
+		s := testhttpserver.New(t)
 		s.HandleFunc("/test", func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusTeapot)
-			w.Write([]byte("Hello, World!"))
+			_, _ = w.Write([]byte("Hello, World!"))
 		})
-		s.Start(ctx)
-		defer s.Stop(ctx)
+		s.Run()
 
-		resp, err := http.Get(s.BaseURL() + "/test")
+		resp, err := http.Get(s.URL("/test"))
 		require.NoError(t, err)
-		defer resp.Body.Close()
+		defer func() {
+			require.NoError(t, resp.Body.Close())
+		}()
 
 		calls := s.Calls("/test")
 		require.Len(t, calls, 1)
@@ -35,6 +32,7 @@ func TestHTTPServer(main *testing.T) {
 
 		assert.Equal(t, http.StatusTeapot, resp.StatusCode)
 		b, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
 		assert.Equal(t, []byte("Hello, World!"), b)
 	})
 }
