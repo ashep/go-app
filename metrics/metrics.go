@@ -31,9 +31,9 @@ var (
 	histograms = make(map[string]*prometheus.HistogramVec)
 )
 
-func RegisterServer(appName, appVer string, srv httpServer) {
-	appName = appName
-	appVersion = appVer
+func RegisterServer(appN, appV string, srv httpServer) {
+	appName = appN
+	appVersion = appV
 	srv.Handle(URLPath, promhttp.Handler())
 }
 
