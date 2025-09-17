@@ -56,7 +56,7 @@ func (r *Runner[RT, CT]) Run() {
 }
 
 // Start starts the application in a separate goroutine.
-func (r *Runner[RT, CT]) Start() {
+func (r *Runner[RT, CT]) Start() *Runner[RT, CT] {
 	ctx, cancel := context.WithCancel(context.Background())
 	r.t.Cleanup(cancel)
 
@@ -73,6 +73,8 @@ func (r *Runner[RT, CT]) Start() {
 			return r.waitStart(r.cfg)
 		}, time.Second*15, time.Millisecond*500, "the app did not start in time")
 	}
+
+	return r
 }
 
 func (r *Runner[RT, CT]) Logs() string {
