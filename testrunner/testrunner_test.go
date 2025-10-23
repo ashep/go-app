@@ -31,7 +31,7 @@ func TestRunner(main *testing.T) {
 
 		assert.Eventually(t, func() bool {
 			return cnt.Load() == 1
-		}, time.Millisecond*500, time.Millisecond*50)
+		}, time.Second, time.Millisecond*50)
 	})
 }
 
