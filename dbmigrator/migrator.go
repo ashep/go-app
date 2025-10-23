@@ -40,7 +40,7 @@ func RunPostgres(url string, fs embed.FS, path string) (uint, error) {
 		return 0, fmt.Errorf("apply migrations: %w", err)
 	}
 
-	ver, dirty, err = mig.Version()
+	ver, _q, err = mig.Version()
 	if err != nil && !errors.Is(err, migrate.ErrNilVersion) {
 		return 0, fmt.Errorf("get db version after migration: %w", err)
 	}
