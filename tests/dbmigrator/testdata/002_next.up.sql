@@ -1,0 +1,5 @@
+CREATE TABLE test2 (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT now()
+);

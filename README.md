@@ -1,3 +1,3 @@
 # go-app
 
-Go application essentials.
+Essential elements for building Go applications.
