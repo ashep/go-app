@@ -39,13 +39,19 @@ func TestDBMigrator(main *testing.T) {
 	main.Run("Success", func(t *testing.T) {
 		reset(t)
 
-		ver, err := dbmigrator.RunPostgres(dbURL, fs, "testdata")
+		res, err := dbmigrator.RunPostgres(dbURL, fs, "testdata")
 		require.NoError(t, err)
-		require.Equal(t, uint(2), ver)
+		require.Equal(t, &dbmigrator.MigrationResult{
+			PrevVersion: 0,
+			NewVersion:  2,
+		}, res)
 
 		// Run again, should be no changes
-		ver, err = dbmigrator.RunPostgres(dbURL, fs, "testdata")
+		res, err = dbmigrator.RunPostgres(dbURL, fs, "testdata")
 		require.NoError(t, err)
-		require.Equal(t, uint(2), ver)
+		require.Equal(t, &dbmigrator.MigrationResult{
+			PrevVersion: 2,
+			NewVersion:  2,
+		}, res)
 	})
 }
