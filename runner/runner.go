@@ -9,6 +9,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strings"
+	"sync"
 	"syscall"
 
 	"github.com/ashep/go-app/cfgloader"
@@ -19,6 +20,8 @@ import (
 var (
 	appName = "" //nolint:gochecknoglobals // set externally
 	appVer  = "" //nolint:gochecknoglobals // set externally
+
+	mux = &sync.Mutex{}
 )
 
 type Validatable interface {
@@ -41,6 +44,10 @@ type Runner[RT func(*Runtime[CT]) error, CT any] struct {
 }
 
 func New[RT func(*Runtime[CT]) error, CT any](run RT) *Runner[RT, CT] {
+	// Avoid races when multiple runners are created in tests
+	mux.Lock()
+	defer mux.Unlock()
+
 	if appName == "" {
 		appName = os.Getenv("APP_NAME")
 	}

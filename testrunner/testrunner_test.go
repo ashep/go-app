@@ -11,13 +11,19 @@ import (
 )
 
 func TestRunner(main *testing.T) {
+	main.Parallel()
+
 	main.Run("Run", func(t *testing.T) {
+		t.Parallel()
+
 		cnt := &atomic.Int64{}
 		testrunner.New(t, runMock, cfgMock{t: t, foo: "bar", cnt: cnt}).Run()
 		assert.Equal(t, int64(1), cnt.Load())
 	})
 
 	main.Run("Start", func(t *testing.T) {
+		t.Parallel()
+
 		cnt := &atomic.Int64{}
 
 		testrunner.New(t, runMock, cfgMock{
@@ -26,11 +32,11 @@ func TestRunner(main *testing.T) {
 			cnt:  cnt,
 			wait: true,
 		}).
-			SetStartWaiter(func(cfg cfgMock) bool { cfg.cnt.Store(1); return true }).
+			SetStartWaiter(func(cfg cfgMock) bool { cfg.cnt.Add(1); return true }).
 			Start()
 
 		assert.Eventually(t, func() bool {
-			return cnt.Load() == 1
+			return cnt.Load() == 2
 		}, time.Second, time.Millisecond*50)
 	})
 }
