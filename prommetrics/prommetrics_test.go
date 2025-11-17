@@ -1,4 +1,4 @@
-package metrics_test
+package prommetrics_test
 
 import (
 	"io"
@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ashep/go-app/metrics"
+	"github.com/ashep/go-app/prommetrics"
 	"github.com/ashep/go-app/testhttpserver"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -15,9 +15,9 @@ import (
 func TestRegisterServer(main *testing.T) {
 	main.Run("Ok", func(t *testing.T) {
 		s := testhttpserver.New(t)
-		metrics.RegisterServer("an-app", "1.2.3", s)
+		prommetrics.RegisterServer("an-app", "1.2.3", s)
 		s.HandleFunc("/foo", func(w http.ResponseWriter, r *http.Request) {
-			metrics.MeasureHTTPServerRequest(r, "/foo")(http.StatusOK)
+			prommetrics.MeasureHTTPServerRequest(r, "/foo")(http.StatusOK)
 			w.WriteHeader(http.StatusOK)
 		})
 		s.Run()
@@ -25,7 +25,7 @@ func TestRegisterServer(main *testing.T) {
 		_, err := http.Get(s.URL("/foo"))
 		require.NoError(t, err)
 
-		res, err := http.Get(s.URL(metrics.URLPath))
+		res, err := http.Get(s.URL(prommetrics.URLPath))
 		require.NoError(t, err)
 
 		b, err := io.ReadAll(res.Body)

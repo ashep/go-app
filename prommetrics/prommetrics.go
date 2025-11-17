@@ -1,4 +1,4 @@
-package metrics
+package prommetrics
 
 import (
 	"net/http"
@@ -32,6 +32,9 @@ var (
 )
 
 func RegisterServer(appN, appV string, srv httpServer) {
+	mux.Lock()
+	defer mux.Unlock()
+
 	appName = appN
 	appVersion = appV
 	srv.Handle(URLPath, promhttp.Handler())
@@ -62,7 +65,7 @@ func MeasureHTTPServerRequest(req *http.Request, path string) func(int) {
 	}
 }
 
-func MesureHTTPClientRequest(req *http.Request, path string) func(int) {
+func MeasureHTTPClientRequest(req *http.Request, path string) func(int) {
 	lbs := prometheus.Labels{
 		"method": req.Method,
 		"host":   req.Host,
