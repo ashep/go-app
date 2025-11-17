@@ -21,7 +21,7 @@ func TestRunner(main *testing.T) {
 		assert.Equal(t, int64(1), cnt.Load())
 	})
 
-	main.Run("Start", func(t *testing.T) {
+	main.Run("StartWithWaiter", func(t *testing.T) {
 		t.Parallel()
 
 		cnt := &atomic.Int64{}

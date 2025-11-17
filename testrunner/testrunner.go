@@ -3,6 +3,7 @@ package testrunner
 import (
 	"context"
 	"net"
+	"net/http"
 	"testing"
 	"time"
 
@@ -39,11 +40,29 @@ func (r *Runner[RT, CT]) SetStartWaiter(w func(CT) bool) *Runner[RT, CT] {
 	return r
 }
 
-func (r *Runner[RT, CT]) SetTCPPortStartWaiter(addr *net.TCPAddr) *Runner[RT, CT] {
+func (r *Runner[RT, CT]) SetTCPReadyStartWaiter(addr *net.TCPAddr) *Runner[RT, CT] {
 	r.SetStartWaiter(func(CT) bool {
 		_, err := net.DialTCP("tcp", nil, addr)
 		return err == nil
 	})
+
+	return r
+}
+
+func (r *Runner[RT, CT]) SetHTTPReadyStartWaiter(url string) *Runner[RT, CT] {
+	r.SetStartWaiter(func(CT) bool {
+		res, err := http.DefaultClient.Get(url)
+		if err != nil {
+			return false
+		}
+
+		defer func() {
+			_ = res.Body.Close()
+		}()
+
+		return res.StatusCode == http.StatusOK
+	})
+
 	return r
 }
 
