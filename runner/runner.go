@@ -118,7 +118,6 @@ func (r *Runner[RT, CT]) LoadConfigFile(path string) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) LoadEnvConfig() *Runner[RT, CT] {
-	// Load config from env
 	for _, prefix := range []string{"APP", r.rt.AppName2} {
 		if err := cfgloader.LoadFromEnv(prefix, r.rt.Cfg); err != nil {
 			fmt.Printf("Error loading config from %s_ env vars failed", prefix)

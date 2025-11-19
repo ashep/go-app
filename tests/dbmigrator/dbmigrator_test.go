@@ -41,23 +41,23 @@ func TestDBMigrator(main *testing.T) {
 	main.Run("Success", func(t *testing.T) {
 		reset(t)
 
-		l, lb := testlogger.New()
+		l := testlogger.New(t)
 
-		res, err := dbmigrator.RunPostgres(dbURL, fs, "testdata", l)
+		res, err := dbmigrator.RunPostgres(dbURL, fs, "testdata", l.Logger())
 		require.NoError(t, err)
 		require.Equal(t, &dbmigrator.MigrationResult{
 			PrevVersion: 0,
 			NewVersion:  2,
 		}, res)
-		assert.NotContains(t, lb.Content(), "error", "there should be no error logs")
+		assert.NotContains(t, l.Content(), "error", "there should be no error logs")
 
 		// Run again, should be no changes
-		res, err = dbmigrator.RunPostgres(dbURL, fs, "testdata", l)
+		res, err = dbmigrator.RunPostgres(dbURL, fs, "testdata", l.Logger())
 		require.NoError(t, err)
 		require.Equal(t, &dbmigrator.MigrationResult{
 			PrevVersion: 2,
 			NewVersion:  2,
 		}, res)
-		assert.NotContains(t, lb.Content(), "error", "there should be no error logs")
+		assert.NotContains(t, l.Content(), "error", "there should be no error logs")
 	})
 }

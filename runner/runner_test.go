@@ -19,7 +19,7 @@ type runCfg struct {
 
 func TestRunner(main *testing.T) {
 	main.Run("Ok", func(t *testing.T) {
-		l, lb := testlogger.New()
+		l := testlogger.New(t)
 		lSrv := newLogServerMock(t)
 
 		t.Setenv("APP_KEY2", "Key2Value")
@@ -35,13 +35,13 @@ func TestRunner(main *testing.T) {
 				Key1: "Key1Value",
 			}).
 			LoadEnvConfig().
-			AddLogWriter(l).
+			AddLogWriter(l.Logger()).
 			AddHTTPLogWriter().
 			Run()
 		require.NoError(t, err)
 
 		assert.Equal(t, `{"app":"foo-bar","app_v":"1.2.3","level":"info","message":"test log message"}
-`, lb.Content())
+`, l.Content())
 
 		lSrvCalls := lSrv.Calls("/log")
 		require.Equal(t, 1, len(lSrvCalls))

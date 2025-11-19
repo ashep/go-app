@@ -34,7 +34,7 @@ func TestRunner(main *testing.T) {
 			cnt:  cnt,
 			wait: true,
 		}).
-			SetStartWaiter(func(cfg cfgMock) bool { cfg.cnt.Add(1); return true }).
+			SetStartWaiter(func(cfg cfgMock) bool { cfg.cnt.Add(1); return true }, time.Second).
 			Start()
 
 		assert.Eventually(t, func() bool {
