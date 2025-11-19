@@ -8,6 +8,7 @@ import (
 	"github.com/golang-migrate/migrate/v4"
 	pgxdrv "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
+	"github.com/rs/zerolog"
 )
 
 type MigrationResult struct {
@@ -15,7 +16,7 @@ type MigrationResult struct {
 	NewVersion  uint
 }
 
-func RunPostgres(url string, fs embed.FS, path string) (*MigrationResult, error) {
+func RunPostgres(url string, fs embed.FS, path string, l zerolog.Logger) (*MigrationResult, error) {
 	srcDrv, err := iofs.New(fs, path)
 	if err != nil {
 		return nil, fmt.Errorf("load migrations: %w", err)
@@ -25,6 +26,11 @@ func RunPostgres(url string, fs embed.FS, path string) (*MigrationResult, error)
 	if err != nil {
 		return nil, fmt.Errorf("open db: %w", err)
 	}
+	defer func() {
+		if err := dbDrv.Close(); err != nil {
+			l.Error().Err(err).Msg("failed to close db driver")
+		}
+	}()
 
 	mig, err := migrate.NewWithInstance("iofs", srcDrv, "postgres", dbDrv)
 	if err != nil {

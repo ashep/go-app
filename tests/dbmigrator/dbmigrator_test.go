@@ -8,7 +8,9 @@ import (
 	"testing"
 
 	"github.com/ashep/go-app/dbmigrator"
+	"github.com/ashep/go-app/testlogger"
 	"github.com/jackc/pgx/v5"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,19 +41,23 @@ func TestDBMigrator(main *testing.T) {
 	main.Run("Success", func(t *testing.T) {
 		reset(t)
 
-		res, err := dbmigrator.RunPostgres(dbURL, fs, "testdata")
+		l, lb := testlogger.New()
+
+		res, err := dbmigrator.RunPostgres(dbURL, fs, "testdata", l)
 		require.NoError(t, err)
 		require.Equal(t, &dbmigrator.MigrationResult{
 			PrevVersion: 0,
 			NewVersion:  2,
 		}, res)
+		assert.NotContains(t, lb.Content(), "error", "there should be no error logs")
 
 		// Run again, should be no changes
-		res, err = dbmigrator.RunPostgres(dbURL, fs, "testdata")
+		res, err = dbmigrator.RunPostgres(dbURL, fs, "testdata", l)
 		require.NoError(t, err)
 		require.Equal(t, &dbmigrator.MigrationResult{
 			PrevVersion: 2,
 			NewVersion:  2,
 		}, res)
+		assert.NotContains(t, lb.Content(), "error", "there should be no error logs")
 	})
 }
