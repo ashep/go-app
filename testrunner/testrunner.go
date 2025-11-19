@@ -1,7 +1,6 @@
 package testrunner
 
 import (
-	"context"
 	"net"
 	"net/http"
 	"testing"
@@ -75,15 +74,12 @@ func (r *Runner[RT, CT]) Run() error {
 
 // Start starts the application in a separate goroutine.
 func (r *Runner[RT, CT]) Start() *Runner[RT, CT] {
-	ctx, cancel := context.WithCancel(context.Background())
-	r.t.Cleanup(cancel)
-
 	rnr := runner.New(r.run).
 		SetConfig(r.cfg).
 		AddLogWriter(r.l)
 
 	go func() {
-		if err := rnr.RunContext(ctx); err != nil {
+		if err := rnr.RunContext(r.t.Context()); err != nil {
 			r.t.Logf("app run failed: %v", err)
 		}
 	}()
@@ -92,6 +88,7 @@ func (r *Runner[RT, CT]) Start() *Runner[RT, CT] {
 		ok := assert.Eventually(r.t, func() bool {
 			return r.waitStart(r.cfg)
 		}, time.Second*3, time.Millisecond*100, "the app did not start in time")
+
 		if !ok {
 			r.t.Logf("Logs:\n%s", r.Logs())
 		}
