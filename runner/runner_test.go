@@ -28,7 +28,7 @@ func TestRunner(main *testing.T) {
 		t.Setenv("APP_LOGSERVER_USERNAME", "aLogServerUsername")
 		t.Setenv("APP_LOGSERVER_PASSWORD", "aLogServerPassword")
 
-		runner.New(newRunMock(t)).
+		err := runner.New(newRunMock(t)).
 			SetAppName("foo-bar").
 			SetAppVersion("1.2.3").
 			SetConfig(runCfg{
@@ -38,6 +38,7 @@ func TestRunner(main *testing.T) {
 			AddLogWriter(l).
 			AddHTTPLogWriter().
 			Run()
+		require.NoError(t, err)
 
 		assert.Equal(t, `{"app":"foo-bar","app_v":"1.2.3","level":"info","message":"test log message"}
 `, lb.Content())

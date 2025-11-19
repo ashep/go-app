@@ -8,6 +8,7 @@ import (
 	"github.com/ashep/go-app/runner"
 	"github.com/ashep/go-app/testrunner"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRunner(main *testing.T) {
@@ -17,7 +18,8 @@ func TestRunner(main *testing.T) {
 		t.Parallel()
 
 		cnt := &atomic.Int64{}
-		testrunner.New(t, runMock, cfgMock{t: t, foo: "bar", cnt: cnt}).Run()
+		err := testrunner.New(t, runMock, cfgMock{t: t, foo: "bar", cnt: cnt}).Run()
+		require.NoError(t, err)
 		assert.Equal(t, int64(1), cnt.Load())
 	})
 

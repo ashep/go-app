@@ -38,9 +38,13 @@ func (r *Runner[RT, CT]) SetStartWaiter(w func(CT) bool) *Runner[RT, CT] {
 	return r
 }
 
-func (r *Runner[RT, CT]) SetTCPReadyStartWaiter(addr *net.TCPAddr) *Runner[RT, CT] {
+func (r *Runner[RT, CT]) SetTCPReadyStartWaiter(addr string) *Runner[RT, CT] {
+	nAddr, err := net.ResolveTCPAddr("tcp", addr)
+	if err != nil {
+	}
+
 	r.SetStartWaiter(func(CT) bool {
-		_, err := net.DialTCP("tcp", nil, addr)
+		_, err := net.DialTCP("tcp", nil, nAddr)
 		return err == nil
 	})
 
