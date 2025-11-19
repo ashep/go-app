@@ -10,6 +10,7 @@ import (
 	"github.com/ashep/go-app/testlogger"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type Runner[RT func(*runner.Runtime[CT]) error, CT any] struct {
@@ -40,8 +41,7 @@ func (r *Runner[RT, CT]) SetStartWaiter(w func(CT) bool) *Runner[RT, CT] {
 
 func (r *Runner[RT, CT]) SetTCPReadyStartWaiter(addr string) *Runner[RT, CT] {
 	nAddr, err := net.ResolveTCPAddr("tcp", addr)
-	if err != nil {
-	}
+	require.NoError(r.t, err)
 
 	r.SetStartWaiter(func(CT) bool {
 		_, err := net.DialTCP("tcp", nil, nAddr)
