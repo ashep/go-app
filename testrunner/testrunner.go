@@ -11,7 +11,6 @@ import (
 	"github.com/ashep/go-app/testlogger"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 type Runner[RT func(*runner.Runtime[CT]) error, CT any] struct {
@@ -67,11 +66,11 @@ func (r *Runner[RT, CT]) SetHTTPReadyStartWaiter(url string) *Runner[RT, CT] {
 }
 
 // Run runs the application and waits until it stops.
-func (r *Runner[RT, CT]) Run() {
-	runner.New(r.run).
+func (r *Runner[RT, CT]) Run() error {
+	return runner.New(r.run).
 		SetConfig(r.cfg).
 		AddLogWriter(r.l).
-		Run()
+		RunContext(r.t.Context())
 }
 
 // Start starts the application in a separate goroutine.
@@ -84,13 +83,18 @@ func (r *Runner[RT, CT]) Start() *Runner[RT, CT] {
 		AddLogWriter(r.l)
 
 	go func() {
-		rnr.RunContext(ctx)
+		if err := rnr.RunContext(ctx); err != nil {
+			r.t.Logf("app run failed: %v", err)
+		}
 	}()
 
 	if r.waitStart != nil {
-		require.Eventually(r.t, func() bool {
+		ok := assert.Eventually(r.t, func() bool {
 			return r.waitStart(r.cfg)
-		}, time.Second*15, time.Millisecond*500, "the app did not start in time")
+		}, time.Second*3, time.Millisecond*100, "the app did not start in time")
+		if !ok {
+			r.t.Logf("Logs:\n%s", r.Logs())
+		}
 	}
 
 	return r

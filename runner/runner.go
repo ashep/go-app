@@ -172,7 +172,7 @@ func (r *Runner[RT, CT]) AddHTTPLogWriter() *Runner[RT, CT] {
 	return r.AddLogWriter(w)
 }
 
-func (r *Runner[RT, CT]) RunContext(ctx context.Context) {
+func (r *Runner[RT, CT]) RunContext(ctx context.Context) error {
 	r.rt.Ctx = ctx
 
 	logLevel := zerolog.InfoLevel
@@ -188,17 +188,19 @@ func (r *Runner[RT, CT]) RunContext(ctx context.Context) {
 	if appCfgT, ok := any(r.rt.Cfg).(Validatable); ok {
 		if err := appCfgT.Validate(); err != nil {
 			r.rt.Log.Error().Err(err).Msg("config validation failed")
-			os.Exit(1)
+			return err
 		}
 	}
 
 	if err := r.run(r.rt); err != nil && !errors.Is(err, context.Canceled) {
 		r.rt.Log.Error().Err(err).Msg("app run failed")
-		os.Exit(1)
+		return err
 	}
+
+	return nil
 }
 
-func (r *Runner[RT, CT]) Run() {
+func (r *Runner[RT, CT]) Run() error {
 	ctx, ctxC := context.WithCancel(context.Background())
 	defer ctxC()
 
@@ -209,7 +211,7 @@ func (r *Runner[RT, CT]) Run() {
 		ctxC()
 	}()
 
-	r.RunContext(ctx)
+	return r.RunContext(ctx)
 }
 
 func isTerminal() bool {
