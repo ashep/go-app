@@ -72,7 +72,8 @@ func New(l zerolog.Logger) *Client {
 		c: &c,
 		l: l,
 
-		mux: &sync.Mutex{},
+		reqNum: &atomic.Int32{},
+		mux:    &sync.Mutex{},
 	}
 
 	cli.c.Transport.(*http.Transport).Proxy = func(request *http.Request) (*url.URL, error) {
