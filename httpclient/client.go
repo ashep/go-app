@@ -144,7 +144,7 @@ func (c *Client) DumpTransaction(
 	tryNum int,
 ) {
 	// Create a dump file
-	fPath := filepath.Join(c.dumpDir, fmt.Sprintf("%04d-%02d.txt", c.reqNum, tryNum))
+	fPath := filepath.Join(c.dumpDir, fmt.Sprintf("%04d-%02d.txt", c.reqNum.Load(), tryNum))
 	f, err := os.Create(fPath)
 	if err != nil {
 		c.l.Error().Err(err).Str("path", fPath).Msg("failed to create dump file")
