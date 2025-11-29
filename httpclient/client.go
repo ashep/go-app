@@ -29,23 +29,18 @@ var DefaultUA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " 
 	"(KHTML, like Gecko) Chrome/86.0.4240.75 Safari/537.36"
 
 type Client struct {
-	id           string
-	userAgents   []string
-	proxyURLs    []string
-	errorHandler ErrorHandler
-	maxTries     int
-	dumpDir      string
+	id         string
+	userAgents []string
+	proxyURLs  []string
+	maxTries   int
+	dumpDir    string
 
 	c *http.Client
 	l zerolog.Logger
 
-	reqNum        int32
-	handlingError bool
-	mux           *sync.Mutex
+	reqNum *atomic.Int32
+	mux    *sync.Mutex
 }
-
-// ErrorHandler is HTTP request error handler
-type ErrorHandler func(ctx context.Context, c *Client, req *http.Request, rsp *http.Response, err error, tryN int) error
 
 // New instantiates a client
 func New(l zerolog.Logger) *Client {
@@ -100,10 +95,6 @@ func (c *Client) SetUserAgents(ua []string) {
 
 func (c *Client) SetProxyURLs(urls []string) {
 	c.proxyURLs = urls
-}
-
-func (c *Client) SetErrorHandler(fn ErrorHandler) {
-	c.errorHandler = fn
 }
 
 func (c *Client) SetMaxTries(n int) {
@@ -163,7 +154,8 @@ func (c *Client) DumpTransaction(
 	}()
 
 	// Dump method and URL
-	if _, err := f.WriteString(fmt.Sprintf("%v %v\n\n", req.Method, req.URL)); err != nil {
+
+	if _, err := fmt.Fprintf(f, "%v %v\n\n", req.Method, req.URL); err != nil {
 		c.l.Error().Err(err).Str("path", fPath).Msg("failed to write to dump file")
 		return
 	}
@@ -171,7 +163,7 @@ func (c *Client) DumpTransaction(
 	// Dump request headers
 	for k, h := range req.Header {
 		for _, v := range h {
-			if _, err := f.Write([]byte(fmt.Sprintf("%v: %v\n", k, v))); err != nil {
+			if _, err := fmt.Fprintf(f, "%v: %v\n", k, v); err != nil {
 				c.l.Error().Err(err).Str("path", fPath).Msg("failed to write to dump file")
 				return
 			}
@@ -208,7 +200,7 @@ func (c *Client) DumpTransaction(
 	// Dump response headers
 	for k, h := range resp.Header {
 		for _, v := range h {
-			if _, err := f.Write([]byte(fmt.Sprintf("%v: %v\n", k, v))); err != nil {
+			if _, err := fmt.Fprintf(f, "%v: %v\n", k, v); err != nil {
 				c.l.Error().Err(err).Str("path", fPath).Msg("failed to write to dump file")
 				return
 			}
@@ -278,24 +270,15 @@ func (c *Client) DoRequest(
 		rspBody []byte
 	)
 
-	reqNum := atomic.LoadInt32(&c.reqNum)
 	tryNum := 1
 	for ; ; tryNum++ {
 		select {
 		case <-ctx.Done():
 			return nil, nil, ctx.Err()
 		default:
-			// While handling error, it's allowed to work only to error handler, others must wait
-			if c.handlingError {
-				if _, ok := ctx.Value("errorHandler").(bool); !ok {
-					c.l.Debug().Msg("waiting for client readiness")
-					time.Sleep(time.Second)
-					continue
-				}
-			}
 		}
 
-		reqNum = atomic.AddInt32(&c.reqNum, 1)
+		c.reqNum.Add(1)
 
 		req, err = c.newRequest(ctx, method, u, header.Clone(), body)
 		if err != nil {
@@ -311,7 +294,7 @@ func (c *Client) DoRequest(
 
 		c.l.Warn().
 			Err(err).
-			Int32("req_n", reqNum).
+			Int32("req_n", c.reqNum.Load()).
 			Int("try_n", tryNum).
 			Str("method", method).
 			Str("url", u).
@@ -328,22 +311,6 @@ func (c *Client) DoRequest(
 			_ = res.Body.Close()
 		}
 
-		if c.errorHandler != nil {
-			if c.handlingError {
-				return nil, nil, fmt.Errorf("error is already being handled by another goroutine")
-			}
-
-			c.mux.Lock()
-			c.handlingError = true
-			hErr := c.errorHandler(context.WithValue(ctx, "errorHandler", true), c, req, res, err, tryNum)
-			c.handlingError = false
-			c.mux.Unlock()
-
-			if hErr != nil {
-				return nil, nil, fmt.Errorf("%w, %w", err, hErr)
-			}
-		}
-
 		if tryNum == c.maxTries || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 			return nil, nil, err
 		}
@@ -352,7 +319,7 @@ func (c *Client) DoRequest(
 	}
 
 	c.l.Debug().
-		Int32("req_n", reqNum).
+		Int32("req_n", c.reqNum.Load()).
 		Int("try_n", tryNum).
 		Str("method", method).
 		Str("url", u).
