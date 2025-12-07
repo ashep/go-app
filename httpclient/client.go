@@ -272,7 +272,7 @@ func (c *Client) DoRequest(
 	)
 
 	tryNum := 1
-	for ; ; tryNum++ {
+	for ; tryNum < c.maxTries; tryNum++ {
 		select {
 		case <-ctx.Done():
 			return nil, nil, ctx.Err()
@@ -287,7 +287,7 @@ func (c *Client) DoRequest(
 		}
 
 		res, err = c.c.Do(req)
-		if err == nil && res.StatusCode > 199 && res.StatusCode < 300 {
+		if err == nil && res.StatusCode > 199 && res.StatusCode < 500 {
 			break
 		} else if err == nil {
 			err = errors.New(res.Status)
@@ -310,10 +310,6 @@ func (c *Client) DoRequest(
 
 		if res != nil {
 			_ = res.Body.Close()
-		}
-
-		if tryNum == c.maxTries || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return nil, nil, err
 		}
 
 		time.Sleep(time.Second * time.Duration(tryNum))
@@ -349,7 +345,7 @@ func (c *Client) DoRequest(
 // Get perform a GET request
 func (c *Client) Get(ctx context.Context, u string, args url.Values, header http.Header) ([]byte, error) {
 	if args != nil {
-		u = CombineURL(u, "", args)
+		u = AddURLQueryArgs(u, args)
 	}
 
 	_, body, err := c.DoRequest(ctx, "GET", u, header, []byte(""))
@@ -396,7 +392,7 @@ func (c *Client) GetFile(ctx context.Context, u string, args url.Values, header 
 	fExt := ""
 
 	if args != nil {
-		u = CombineURL(u, "", args)
+		u = AddURLQueryArgs(u, args)
 	}
 
 	resp, body, err := c.DoRequest(ctx, "GET", u, header, nil)
@@ -528,21 +524,11 @@ func (c *Client) GetExtIPAddrInfo(ctx context.Context) (string, error) {
 	return strings.ReplaceAll(r, "\n", ""), nil
 }
 
-// CombineURL combines two URLs
-func CombineURL(a string, b string, args url.Values) string {
+// AddURLQueryArgs adds query arguments to a URL
+func AddURLQueryArgs(a string, args url.Values) string {
 	aURL, err := url.Parse(a)
 	if err != nil {
 		return ""
-	}
-
-	if b != "" {
-		bURL, err := url.Parse(b)
-		if err != nil {
-			return ""
-		}
-
-		aURL.Path += bURL.Path
-		aURL.Path = strings.ReplaceAll(aURL.Path, "//", "/")
 	}
 
 	if args != nil {

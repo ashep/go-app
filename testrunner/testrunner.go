@@ -59,7 +59,7 @@ func (r *Runner[RT, CT]) SetHTTPReadyStartWaiter(url string, timeout time.Durati
 			_ = res.Body.Close()
 		}()
 
-		return res.StatusCode == http.StatusOK
+		return res.StatusCode < http.StatusInternalServerError
 	}, timeout)
 
 	return r
