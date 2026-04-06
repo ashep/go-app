@@ -1,4 +1,5 @@
 .ci
 .idea
+.claude
 /tmp
 /vendor

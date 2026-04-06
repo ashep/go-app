@@ -2,12 +2,15 @@ package testpostgres
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
 
+	"github.com/ashep/go-app/dbmigrator"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -37,12 +40,19 @@ func WithPassword(password string) Option {
 	}
 }
 
+func WithMigrations(src []dbmigrator.Source) Option {
+	return func(p *Config) {
+		p.migrations = src
+	}
+}
+
 type Config struct {
-	t        *testing.T
-	host     string
-	port     int
-	user     string
-	password string
+	t          *testing.T
+	host       string
+	port       int
+	user       string
+	password   string
+	migrations []dbmigrator.Source
 }
 
 type Postgres struct {
@@ -50,7 +60,7 @@ type Postgres struct {
 	pool *pgxpool.Pool
 }
 
-func New(t *testing.T, opts ...Option) *Postgres {
+func New(t *testing.T, l zerolog.Logger, opts ...Option) *Postgres {
 	cfg := &Config{
 		t:        t,
 		host:     "postgres",
@@ -81,6 +91,19 @@ func New(t *testing.T, opts ...Option) *Postgres {
 		require.NoError(t, err, "failed to drop database "+dbName)
 		db.Close()
 	})
+
+	if cfg.migrations != nil {
+		migRes, err := dbmigrator.RunPostgres(testDSN, l, cfg.migrations...)
+		if err != nil {
+			panic(fmt.Errorf("migrate db: %w", err))
+		}
+		if migRes.PrevVersion != migRes.NewVersion {
+			l.Info().
+				Uint("from", migRes.PrevVersion).
+				Uint("to", migRes.NewVersion).
+				Msg("database migrated")
+		}
+	}
 
 	return &Postgres{
 		dsn:  testDSN,
