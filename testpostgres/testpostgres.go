@@ -8,41 +8,47 @@ import (
 	"testing"
 
 	"github.com/ashep/go-app/dbmigrator"
+	"github.com/ashep/go-app/testlogger"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
 type Option func(*Config)
 
 func WithHost(host string) Option {
-	return func(p *Config) {
-		p.host = host
+	return func(c *Config) {
+		c.host = host
 	}
 }
 
 func WithPort(port int) Option {
-	return func(p *Config) {
-		p.port = port
+	return func(c *Config) {
+		c.port = port
 	}
 }
 
 func WithUser(user string) Option {
-	return func(p *Config) {
-		p.user = user
+	return func(c *Config) {
+		c.user = user
 	}
 }
 
 func WithPassword(password string) Option {
-	return func(p *Config) {
-		p.password = password
+	return func(c *Config) {
+		c.password = password
 	}
 }
 
-func WithMigrations(src []dbmigrator.Source) Option {
-	return func(p *Config) {
-		p.migrations = src
+func WithMigrations(src ...dbmigrator.Source) Option {
+	return func(c *Config) {
+		c.migrations = src
+	}
+}
+
+func WithLogger(l *testlogger.Logger) Option {
+	return func(c *Config) {
+		c.l = l
 	}
 }
 
@@ -53,6 +59,7 @@ type Config struct {
 	user       string
 	password   string
 	migrations []dbmigrator.Source
+	l          *testlogger.Logger
 }
 
 type Postgres struct {
@@ -60,7 +67,7 @@ type Postgres struct {
 	pool *pgxpool.Pool
 }
 
-func New(t *testing.T, l zerolog.Logger, opts ...Option) *Postgres {
+func New(t *testing.T, opts ...Option) *Postgres {
 	cfg := &Config{
 		t:        t,
 		host:     "postgres",
@@ -71,6 +78,10 @@ func New(t *testing.T, l zerolog.Logger, opts ...Option) *Postgres {
 
 	for _, opt := range opts {
 		opt(cfg)
+	}
+
+	if cfg.l == nil {
+		cfg.l = testlogger.New(t)
 	}
 
 	dsn := "postgres://" + cfg.user + ":" + cfg.password + "@" + cfg.host + ":" + strconv.Itoa(cfg.port)
@@ -93,15 +104,8 @@ func New(t *testing.T, l zerolog.Logger, opts ...Option) *Postgres {
 	})
 
 	if cfg.migrations != nil {
-		migRes, err := dbmigrator.RunPostgres(testDSN, l, cfg.migrations...)
-		if err != nil {
+		if _, err := dbmigrator.RunPostgres(testDSN, cfg.l.Logger(), cfg.migrations...); err != nil {
 			panic(fmt.Errorf("migrate db: %w", err))
-		}
-		if migRes.PrevVersion != migRes.NewVersion {
-			l.Info().
-				Uint("from", migRes.PrevVersion).
-				Uint("to", migRes.NewVersion).
-				Msg("database migrated")
 		}
 	}
 
