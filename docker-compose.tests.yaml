@@ -2,7 +2,8 @@ services:
   tests:
     image: golang:alpine3.24
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     volumes:
       - type: bind
         source: ./
@@ -12,7 +13,7 @@ services:
   postgres:
     image: postgres:18-alpine
     volumes:
-      - postgres:/var/lib/postgresql/data
+      - postgres:/var/lib/postgresql
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
