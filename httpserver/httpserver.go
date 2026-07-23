@@ -72,6 +72,10 @@ func New(opts ...Option) *Server {
 		opt(s)
 	}
 
+	if *s.srv.Protocols == *new(http.Protocols) {
+		s.srv.Protocols.SetHTTP1(true)
+	}
+
 	if s.lis == nil {
 		WithAddr("127.0.0.1:9000")(s)
 	}
