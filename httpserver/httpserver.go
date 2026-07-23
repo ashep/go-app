@@ -33,6 +33,24 @@ func WithRandomLocalAddr() Option {
 	}
 }
 
+func WithHTTP1(v bool) Option {
+	return func(s *Server) {
+		s.srv.Protocols.SetHTTP1(v)
+	}
+}
+
+func WithHTTP2(v bool) Option {
+	return func(s *Server) {
+		s.srv.Protocols.SetHTTP2(v)
+	}
+}
+
+func WithUnencryptedHTTP2(v bool) Option {
+	return func(s *Server) {
+		s.srv.Protocols.SetUnencryptedHTTP2(v)
+	}
+}
+
 type Server struct {
 	lis net.Listener
 	srv *http.Server
