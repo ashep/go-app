@@ -62,7 +62,8 @@ func New(opts ...Option) *Server {
 
 	s := &Server{
 		srv: &http.Server{
-			Handler: mux,
+			Handler:   mux,
+			Protocols: new(http.Protocols),
 		},
 		mux: mux,
 	}
