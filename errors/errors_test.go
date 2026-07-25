@@ -65,7 +65,7 @@ func TestInvalidArgError(t *testing.T) {
 
 	err := apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}
 
-	assert.Equal(t, "invalid foo: theReason", err.Error())
+	assert.Equal(t, "foo: theReason", err.Error())
 
 	assert.True(t, errors.Is(err, apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}))
 	assert.True(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}))

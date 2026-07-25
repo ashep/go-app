@@ -31,13 +31,14 @@ func (e InvalidArgError) Error() string {
 	s := ""
 
 	if e.Subj != "" {
-		s = "invalid " + e.Subj
+		s += e.Subj
+
 		if e.Reason != "" {
-			s += ": "
+			s += ": " + e.Reason
+		} else {
+			s = "invalid " + s
 		}
 	}
-
-	s += e.Reason
 
 	return s
 }
