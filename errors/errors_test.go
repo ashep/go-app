@@ -63,18 +63,18 @@ func TestAccessDeniedError(t *testing.T) {
 func TestInvalidArgError(t *testing.T) {
 	t.Parallel()
 
-	err := apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}
+	err := apperrors.InvalidArgError{Arg: "foo", Reason: "theReason"}
 
 	assert.Equal(t, "foo: theReason", err.Error())
 
-	assert.True(t, errors.Is(err, apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}))
-	assert.True(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Subj: "foo", Reason: "theReason"}))
+	assert.True(t, errors.Is(err, apperrors.InvalidArgError{Arg: "foo", Reason: "theReason"}))
+	assert.True(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Arg: "foo", Reason: "theReason"}))
 
-	assert.False(t, errors.Is(err, apperrors.InvalidArgError{Subj: "bar", Reason: "theReason"}))
-	assert.False(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Subj: "bar", Reason: "theReason"}))
+	assert.False(t, errors.Is(err, apperrors.InvalidArgError{Arg: "bar", Reason: "theReason"}))
+	assert.False(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Arg: "bar", Reason: "theReason"}))
 
-	assert.False(t, errors.Is(err, apperrors.InvalidArgError{Subj: "foo", Reason: "theOtherReason"}))
-	assert.False(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Subj: "foo", Reason: "theOtherReason"}))
+	assert.False(t, errors.Is(err, apperrors.InvalidArgError{Arg: "foo", Reason: "theOtherReason"}))
+	assert.False(t, errors.Is(fmt.Errorf("wrap: %w", err), apperrors.InvalidArgError{Arg: "foo", Reason: "theOtherReason"}))
 
 	assert.True(t, errors.As(err, &apperrors.InvalidArgError{}))
 	assert.True(t, errors.As(fmt.Errorf("wrap: %w", err), &apperrors.InvalidArgError{}))

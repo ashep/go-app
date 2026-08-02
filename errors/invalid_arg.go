@@ -1,15 +1,15 @@
 package errors
 
 type InvalidArgError struct {
-	Subj   string
+	Arg    string
 	Reason string
 }
 
 func (e InvalidArgError) Error() string {
 	s := ""
 
-	if e.Subj != "" {
-		s += e.Subj
+	if e.Arg != "" {
+		s += e.Arg
 
 		if e.Reason != "" {
 			s += ": " + e.Reason
@@ -21,16 +21,16 @@ func (e InvalidArgError) Error() string {
 	return s
 }
 
-func NewInvalidArg(subj, reason string) error {
+func NewInvalidArg(arg, reason string) error {
 	return InvalidArgError{
-		Subj:   subj,
+		Arg:    arg,
 		Reason: reason,
 	}
 }
 
-func NewRequired(subj string) error {
+func NewRequiredArg(subj string) error {
 	return InvalidArgError{
-		Subj:   subj,
+		Arg:    subj,
 		Reason: "required",
 	}
 }
