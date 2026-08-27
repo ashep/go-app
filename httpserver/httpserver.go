@@ -52,9 +52,10 @@ func WithUnencryptedHTTP2(v bool) Option {
 }
 
 type Server struct {
-	lis net.Listener
-	srv *http.Server
-	mux *http.ServeMux
+	lis     net.Listener
+	srv     *http.Server
+	mux     *http.ServeMux
+	stopped chan struct{}
 }
 
 func New(opts ...Option) *Server {
@@ -65,7 +66,8 @@ func New(opts ...Option) *Server {
 			Handler:   mux,
 			Protocols: new(http.Protocols),
 		},
-		mux: mux,
+		mux:     mux,
+		stopped: make(chan struct{}),
 	}
 
 	for _, opt := range opts {
@@ -96,6 +98,8 @@ func (s *Server) HandleFunc(pattern string, handler func(http.ResponseWriter, *h
 }
 
 func (s *Server) Run(ctx context.Context) error {
+	defer close(s.stopped)
+
 	serveErr := make(chan error)
 
 	go func() {
@@ -116,4 +120,9 @@ func (s *Server) Run(ctx context.Context) error {
 	}()
 
 	return <-serveErr
+}
+
+func (s *Server) Wait() error {
+	<-s.stopped
+	return nil
 }

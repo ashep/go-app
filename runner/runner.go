@@ -33,6 +33,7 @@ type Runtime[CT any] struct {
 	AppName    string
 	AppName2   string
 	AppVersion string
+	Debug      bool
 	Cfg        *CT
 	Log        zerolog.Logger
 }
@@ -67,10 +68,21 @@ func New[RT func(*Runtime[CT]) error, CT any](run RT) *Runner[RT, CT] {
 		appVer = "0.0.1"
 	}
 
+	appName2 := sanitizeAppName(appName)
+
+	dbg := false
+	if dbg1 := strings.ToLower(os.Getenv("APP_DEBUG")); dbg1 == "true" || dbg1 == "1" {
+		dbg = true
+	}
+	if dbg1 := strings.ToLower(os.Getenv(appName2 + "_DEBUG")); dbg1 == "true" || dbg1 == "1" {
+		dbg = true
+	}
+
 	rt := &Runtime[CT]{
 		AppName:    appName,
-		AppName2:   sanitizeAppName(appName),
+		AppName2:   appName2,
 		AppVersion: appVer,
+		Debug:      dbg,
 		Cfg:        new(CT),
 	}
 
@@ -175,10 +187,7 @@ func (r *Runner[RT, CT]) RunContext(ctx context.Context) error {
 	r.rt.Ctx = ctx
 
 	logLevel := zerolog.InfoLevel
-	if dbg := strings.ToLower(os.Getenv("APP_DEBUG")); dbg == "true" || dbg == "1" {
-		logLevel = zerolog.DebugLevel
-	}
-	if dbg := strings.ToLower(os.Getenv(r.rt.AppName2 + "_DEBUG")); dbg == "true" || dbg == "1" {
+	if r.rt.Debug {
 		logLevel = zerolog.DebugLevel
 	}
 	r.rt.Log = zerolog.New(zerolog.MultiLevelWriter(r.logWriters...)).Level(logLevel).
