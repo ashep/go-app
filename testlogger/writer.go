@@ -1,8 +1,6 @@
 package testlogger
 
 import (
-	"encoding/json"
-	"fmt"
 	"strings"
 )
 
@@ -11,24 +9,7 @@ type BufWriter struct {
 }
 
 func (w *BufWriter) Write(s []byte) (int, error) {
-	outer := msg{}
-	if err := json.Unmarshal(s, &outer); err != nil {
-		return 0, fmt.Errorf("unmarshal 1: %w", err)
-	}
-
-	inner := make(map[string]interface{})
-	if err := json.Unmarshal([]byte(outer.Message), &inner); err != nil {
-		return 0, fmt.Errorf("unmarshal 2: %w", err)
-	}
-
-	out, err := json.Marshal(inner)
-	if err != nil {
-		return 0, fmt.Errorf("marshal: %w", err)
-	}
-
-	out = append(out, '\n')
-
-	return w.b.Write(out)
+	return w.b.Write(s)
 }
 
 func (w *BufWriter) Content() string {
