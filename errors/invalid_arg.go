@@ -6,19 +6,19 @@ type InvalidArgError struct {
 }
 
 func (e InvalidArgError) Error() string {
-	s := ""
-
-	if e.Arg != "" {
-		s += e.Arg
-
-		if e.Reason != "" {
-			s += ": " + e.Reason
-		} else {
-			s = "invalid " + s
-		}
+	if e.Arg != "" && e.Reason == "" {
+		return e.Arg + ": invalid"
 	}
 
-	return s
+	if e.Arg == "" && e.Reason != "" {
+		return e.Reason
+	}
+
+	if e.Arg != "" && e.Reason != "" {
+		return e.Arg + ": " + e.Reason
+	}
+
+	return "<empty>"
 }
 
 func NewInvalidArg(arg, reason string) error {
