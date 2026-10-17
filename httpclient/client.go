@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -34,6 +33,7 @@ type Client struct {
 	proxyURLs  []string
 	maxTries   int
 	dumpDir    string
+	sleep      func(ctx context.Context, d time.Duration) error
 
 	c *http.Client
 	l zerolog.Logger
@@ -68,6 +68,7 @@ func New(l zerolog.Logger) *Client {
 		userAgents: []string{DefaultUA},
 		proxyURLs:  []string{},
 		maxTries:   3,
+		sleep:      sleepCtx,
 
 		c: &c,
 		l: l,
@@ -256,7 +257,8 @@ func (c *Client) newRequest(ctx context.Context, method, u string, header http.H
 	return req, nil
 }
 
-// DoRequest performs an HTTP request
+// DoRequest performs an HTTP request, making up to maxTries attempts.
+// Transport errors and 5xx responses are retried, with a growing pause between attempts.
 func (c *Client) DoRequest(
 	ctx context.Context,
 	method,
@@ -264,34 +266,33 @@ func (c *Client) DoRequest(
 	header http.Header,
 	body []byte,
 ) (*http.Response, []byte, error) {
-	var (
-		err     error
-		req     *http.Request
-		res     *http.Response
-		rspBody []byte
-	)
+	var lastErr error
 
-	tryNum := 1
-	for ; tryNum < c.maxTries; tryNum++ {
-		select {
-		case <-ctx.Done():
-			return nil, nil, ctx.Err()
-		default:
+	for tryNum := 1; tryNum <= c.maxTries; tryNum++ {
+		if tryNum > 1 {
+			if err := c.sleep(ctx, time.Second*time.Duration(tryNum-1)); err != nil {
+				return nil, nil, err
+			}
+		}
+
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
 		}
 
 		c.reqNum.Add(1)
 
-		req, err = c.newRequest(ctx, method, u, header.Clone(), body)
+		req, err := c.newRequest(ctx, method, u, header.Clone(), body)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		res, err = c.c.Do(req)
+		res, err := c.c.Do(req)
 		if err == nil && res.StatusCode > 199 && res.StatusCode < 500 {
-			break
+			return c.readResponse(req, res, method, u, body, tryNum)
 		} else if err == nil {
-			err = errors.New(res.Status)
+			err = fmt.Errorf("HTTP response status: %v", res.Status)
 		}
+		lastErr = err
 
 		c.l.Warn().
 			Err(err).
@@ -311,10 +312,19 @@ func (c *Client) DoRequest(
 		if res != nil {
 			_ = res.Body.Close()
 		}
-
-		time.Sleep(time.Second * time.Duration(tryNum))
 	}
 
+	return nil, nil, fmt.Errorf("request failed after %d tries: %w", c.maxTries, lastErr)
+}
+
+func (c *Client) readResponse(
+	req *http.Request,
+	res *http.Response,
+	method,
+	u string,
+	body []byte,
+	tryNum int,
+) (*http.Response, []byte, error) {
 	c.l.Debug().
 		Int32("req_n", c.reqNum.Load()).
 		Int("try_n", tryNum).
@@ -326,7 +336,9 @@ func (c *Client) DoRequest(
 	defer func() {
 		_ = res.Body.Close()
 	}()
-	if rspBody, err = io.ReadAll(res.Body); err != nil {
+
+	rspBody, err := io.ReadAll(res.Body)
+	if err != nil {
 		return res, nil, fmt.Errorf("failed to read response body: %v", err)
 	}
 
@@ -339,7 +351,20 @@ func (c *Client) DoRequest(
 		return res, rspBody, fmt.Errorf("HTTP response status: %v", res.Status)
 	}
 
-	return res, rspBody, err
+	return res, rspBody, nil
+}
+
+// sleepCtx waits for d or until ctx is done, whichever comes first.
+func sleepCtx(ctx context.Context, d time.Duration) error {
+	t := time.NewTimer(d)
+	defer t.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-t.C:
+		return nil
+	}
 }
 
 // Get perform a GET request
