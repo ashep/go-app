@@ -2,6 +2,7 @@ package testlogger
 
 import (
 	"fmt"
+	"io"
 	"strings"
 	"testing"
 
@@ -13,10 +14,6 @@ type Logger struct {
 	t *testing.T
 	l zerolog.Logger
 	w *BufWriter
-}
-
-type msg struct {
-	Message string `json:"message"`
 }
 
 func New(t *testing.T) *Logger {
@@ -31,6 +28,12 @@ func New(t *testing.T) *Logger {
 
 func (l *Logger) Logger() zerolog.Logger {
 	return l.l
+}
+
+// Writer returns the buffer the logger writes to. Pass it, not Logger(), where an io.Writer is expected:
+// a zerolog.Logger used as a writer would wrap every line in a message field of its own.
+func (l *Logger) Writer() io.Writer {
+	return l.w
 }
 
 func (l *Logger) Content() string {

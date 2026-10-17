@@ -69,7 +69,7 @@ func (r *Runner[RT, CT]) SetHTTPReadyStartWaiter(url string, timeout time.Durati
 func (r *Runner[RT, CT]) Run() error {
 	return runner.New(r.run).
 		SetConfig(r.cfg).
-		AddLogWriter(r.l.Logger()).
+		AddLogWriter(r.l.Writer()).
 		RunContext(r.t.Context())
 }
 
@@ -77,7 +77,7 @@ func (r *Runner[RT, CT]) Run() error {
 func (r *Runner[RT, CT]) Start() *Runner[RT, CT] {
 	rnr := runner.New(r.run).
 		SetConfig(r.cfg).
-		AddLogWriter(r.l.Logger())
+		AddLogWriter(r.l.Writer())
 
 	go func() {
 		if err := rnr.RunContext(r.t.Context()); err != nil {

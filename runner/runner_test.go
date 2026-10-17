@@ -35,12 +35,12 @@ func TestRunner(main *testing.T) {
 				Key1: "Key1Value",
 			}).
 			LoadEnvConfig().
-			AddLogWriter(l.Logger()).
+			AddLogWriter(l.Writer()).
 			AddHTTPLogWriter().
 			Run()
 		require.NoError(t, err)
 
-		assert.Equal(t, `{"app":"foo-bar","app_v":"1.2.3","level":"info","message":"test log message"}
+		assert.Equal(t, `{"level":"info","app":"foo-bar","app_v":"1.2.3","message":"test log message"}
 `, l.Content())
 
 		lSrvCalls := lSrv.Calls("/log")

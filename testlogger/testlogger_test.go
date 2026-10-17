@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ashep/go-app/testlogger"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,6 +21,19 @@ func TestLogger(main *testing.T) {
 
 		assert.Equal(t, `{"level":"info","message":"test message"}
 `, tl.Content())
+	})
+
+	main.Run("Writer", func(t *testing.T) {
+		t.Parallel()
+
+		tl := testlogger.New(t)
+		l := zerolog.New(tl.Writer()).With().Str("app", "foo").Logger()
+
+		l.Info().Msg("test message")
+
+		assert.Equal(t, `{"level":"info","app":"foo","message":"test message"}
+`, tl.Content())
+		tl.AssertContains(`"level":"info"`)
 	})
 
 	main.Run("Messages", func(t *testing.T) {
