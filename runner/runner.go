@@ -14,6 +14,7 @@ import (
 
 	"github.com/ashep/go-app/cfgloader"
 	"github.com/ashep/go-app/httplogwriter"
+	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
 )
 
@@ -130,9 +131,16 @@ func (r *Runner[RT, CT]) LoadConfigFile(path string) *Runner[RT, CT] {
 }
 
 func (r *Runner[RT, CT]) LoadEnvConfig() *Runner[RT, CT] {
+	if _, err := os.Stat(".env"); err == nil {
+		if err := godotenv.Load(); err != nil {
+			fmt.Printf("Error loading config from .env file: %s\n", err.Error())
+			os.Exit(1)
+		}
+	}
+
 	for _, prefix := range []string{"APP", r.rt.AppName2} {
 		if err := cfgloader.LoadFromEnv(prefix, r.rt.Cfg); err != nil {
-			fmt.Printf("Error loading config from %s_ env vars failed", prefix)
+			fmt.Printf("Error loading config from %s_ env vars: %s\n", prefix, err.Error())
 			os.Exit(1)
 		}
 	}

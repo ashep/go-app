@@ -81,7 +81,7 @@ func MeasureHTTPClientRequest(req *http.Request, path string) func(int) {
 		lbs["app_v"] = appVersion
 	}
 
-	dur := GetHistogram("http_client_request_duration_seconds", "HTTP server request duration.", lbs)
+	dur := GetHistogram("http_client_request_duration_seconds", "HTTP client request duration.", lbs)
 
 	start := time.Now()
 	return func(statusCode int) {
