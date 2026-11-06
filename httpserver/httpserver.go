@@ -122,7 +122,7 @@ func (s *Server) Run(ctx context.Context) error {
 	return <-serveErr
 }
 
-func (s *Server) Wait() error {
+func (s *Server) Shutdown() error {
 	<-s.stopped
 	return nil
 }
