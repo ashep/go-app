@@ -12,102 +12,134 @@ import (
 
 type Runnable interface {
 	Run(context.Context) error
-	Wait() error
+	Shutdown() error
+}
+
+type task struct {
+	name     string
+	runnable Runnable
+	cfg      taskCfg
 }
 
 type Runner struct {
-	mux   sync.Mutex
-	tasks map[string]Runnable
-	panic bool
-	l     zerolog.Logger
+	mux       sync.Mutex
+	taskNames map[string]struct{}
+	tasks     []task
+	l         zerolog.Logger
 }
 
-func New(opt ...Option) *Runner {
-	cfg := &config{
-		panic: false,
-		l:     zerolog.Nop(),
+func New(opt ...RunnerOption) *Runner {
+	cfg := &runnerCfg{
+		l: zerolog.Nop(),
 	}
 	for _, o := range opt {
 		o(cfg)
 	}
 
 	return &Runner{
-		tasks: make(map[string]Runnable, 0),
-		panic: cfg.panic,
-		l:     cfg.l,
+		tasks:     make([]task, 0),
+		taskNames: make(map[string]struct{}),
+		l:         cfg.l,
 	}
 }
 
-func (g *Runner) Run(ctx context.Context, name string, r Runnable) error {
-	g.mux.Lock()
-	defer g.mux.Unlock()
+func (tr *Runner) Run(ctx context.Context, name string, r Runnable, opts ...TaskOption) error {
+	tr.mux.Lock()
+	defer tr.mux.Unlock()
 
-	if _, ok := g.tasks[name]; ok {
-		return errors.New("already running")
+	if _, ok := tr.taskNames[name]; ok {
+		return fmt.Errorf("%s is already running", name)
+	}
+
+	cfg := taskCfg{
+		shutdownTimeout: time.Second * 5,
+	}
+	for _, o := range opts {
+		o(&cfg)
 	}
 
 	go func() {
 		defer func() {
 			if p := recover(); p != nil {
-				if g.panic {
-					panic(p)
-				}
-				g.l.Error().Err(fmt.Errorf("%v", p)).Msgf("%s panicked", name)
+				tr.l.Error().Err(fmt.Errorf("%v", p)).Msgf("%s panicked", name)
 			}
 
-			g.l.Info().Msgf("%s stopped", name)
+			tr.l.Info().Msgf("%s stopped", name)
 
-			g.mux.Lock()
-			defer g.mux.Unlock()
-			delete(g.tasks, name)
+			tr.mux.Lock()
+			delete(tr.taskNames, name)
+			newTasks := make([]task, 0, len(tr.tasks)-1)
+			for _, t := range tr.tasks {
+				if t.name != name {
+					newTasks = append(newTasks, t)
+				}
+			}
+			tr.mux.Unlock()
+
+			if cfg.autoRestart > 0 {
+				select {
+				case <-ctx.Done():
+					return
+				case <-time.After(cfg.autoRestart):
+					tr.l.Warn().Msgf("restarting %s", name)
+					_ = tr.Run(ctx, name, r, opts...)
+				}
+			}
 		}()
 
 		if err := r.Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
-			g.l.Error().Err(err).Msgf("%s stopped with error", name)
+			tr.l.Error().Err(err).Msgf("%s stopped with error", name)
 		}
 	}()
 
-	g.tasks[name] = r
-	g.l.Info().Msgf("%s started", name)
+	tr.taskNames[name] = struct{}{}
+	tr.tasks = append(tr.tasks, task{
+		name:     name,
+		runnable: r,
+		cfg:      cfg,
+	})
+	tr.l.Info().Msgf("%s started", name)
 
 	return nil
 }
 
-func (g *Runner) Wait(ctx context.Context) error {
+// Wait waits until context is done and then calls Shutdown on each runnable
+func (tr *Runner) Wait(ctx context.Context) error {
 	<-ctx.Done()
-	return g.shutdown(time.Second * 5)
-}
 
-func (g *Runner) shutdown(timeout time.Duration) error {
-	g.mux.Lock()
-	for name, task := range g.tasks {
-		go func(n string) {
+	tr.mux.Lock()
+	defer tr.mux.Unlock()
+
+	shutdownErr := make(chan error)
+	resErr := make([]error, 0)
+
+	for i := len(tr.tasks) - 1; i >= 0; i-- {
+		go func(t *task) {
+			var err error
+
+			sCtx, sCancel := context.WithTimeout(context.Background(), t.cfg.shutdownTimeout)
+			defer sCancel()
+
 			defer func() {
 				if p := recover(); p != nil {
-					g.l.Error().Err(fmt.Errorf("%v", p)).Msgf("%s panicked on stop", n)
+					err = fmt.Errorf("%s panicked on shutdown: %v", t.name, p)
 				}
+
+				shutdownErr <- err
 			}()
-			if err := task.Wait(); err != nil {
-				g.l.Error().Err(err).Msgf("%s stopped with error", n)
-			}
-		}(name)
-	}
-	g.mux.Unlock()
 
-	sCtx, sCancel := context.WithTimeout(context.Background(), timeout)
-	defer sCancel()
-
-	for {
-		select {
-		case <-sCtx.Done():
-			return fmt.Errorf("timeout waiting for tasks to stop")
-		default:
-			g.mux.Lock()
-			if len(g.tasks) == 0 {
-				g.mux.Unlock()
-				return nil
+			select {
+			case <-sCtx.Done():
+				shutdownErr <- sCtx.Err()
+			default:
+				err = t.runnable.Shutdown()
 			}
-			g.mux.Unlock()
+		}(&tr.tasks[i])
+
+		if err := <-shutdownErr; err != nil {
+			resErr = append(resErr, err)
 		}
 	}
+
+	return errors.Join(resErr...)
 }

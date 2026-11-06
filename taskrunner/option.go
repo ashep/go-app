@@ -1,24 +1,38 @@
 package taskrunner
 
 import (
+	"time"
+
 	"github.com/rs/zerolog"
 )
 
-type config struct {
-	panic bool
-	l     zerolog.Logger
+type runnerCfg struct {
+	l zerolog.Logger
 }
 
-type Option func(*config)
+type RunnerOption func(*runnerCfg)
 
-func WithPanic(v bool) Option {
-	return func(o *config) {
-		o.panic = v
+func WithLogger(l zerolog.Logger) RunnerOption {
+	return func(o *runnerCfg) {
+		o.l = l
 	}
 }
 
-func WithLogger(l zerolog.Logger) Option {
-	return func(o *config) {
-		o.l = l
+type taskCfg struct {
+	autoRestart     time.Duration
+	shutdownTimeout time.Duration
+}
+
+type TaskOption func(*taskCfg)
+
+func WithShutdownTimeout(d time.Duration) TaskOption {
+	return func(o *taskCfg) {
+		o.shutdownTimeout = d
+	}
+}
+
+func WithAutoRestart(a time.Duration) TaskOption {
+	return func(o *taskCfg) {
+		o.autoRestart = a
 	}
 }
