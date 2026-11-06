@@ -74,6 +74,7 @@ func (tr *Runner) Run(ctx context.Context, name string, r Runnable, opts ...Task
 					newTasks = append(newTasks, t)
 				}
 			}
+			tr.tasks = newTasks
 			tr.mux.Unlock()
 
 			if cfg.autoRestart > 0 {
